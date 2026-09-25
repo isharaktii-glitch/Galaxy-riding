@@ -8,58 +8,63 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { action } = body;
 
-    // 1. Natural Language / Route Search
-    if (action === 'searchRides') {
-      const { query } = body;
-      const rides = await prisma.ride.findMany({
-        where: { available: true },
+    // 1. Full Register (Driver or Passenger)
+    if (action === 'register') {
+      const { firstName, lastName, email, password, role } = body;
+      const user = await prisma.user.create({
+        data: { firstName, lastName, email, password, role },
       });
-
-      // If DB is empty, return initial fallback seed options
-      if (rides.length === 0) {
-        return NextResponse.json({
-          success: true,
-          rides: [
-            { id: '1', title: 'Galaxy Economy', price: 4500, driverName: 'Saman Perera', fromLocation: 'Colombo', toLocation: 'Kandy', driverLat: 6.9271, driverLng: 79.8612, passengerLat: 7.2906, passengerLng: 80.6337 },
-            { id: '2', title: 'Galaxy Comfort VIP', price: 6500, driverName: 'Kamal Silva', fromLocation: 'Colombo', toLocation: 'Kandy', driverLat: 6.9300, driverLng: 79.8650, passengerLat: 7.2906, passengerLng: 80.6337 }
-          ]
-        });
-      }
-      return NextResponse.json({ success: true, rides });
+      return NextResponse.json({ success: true, user });
     }
 
-    // 2. Passenger Booking Submission + Slip Upload
-    if (action === 'createBooking') {
-      const { rideId, slipData, passengerEmail } = body;
-      
-      const newBooking = await prisma.booking.create({
-        data: {
-          rideId: rideId || '1',
-          paymentSlip: slipData || 'Receipt_Uploaded_Placeholder',
-          status: 'PENDING_APPROVAL',
-        },
+    // 2. Login
+    if (action === 'login') {
+      const { email, password } = body;
+      const user = await prisma.user.findFirst({
+        where: { email, password },
       });
-
-      return NextResponse.json({ success: true, booking: newBooking });
+      if (!user) return NextResponse.json({ success: false, message: 'Invalid credentials' }, { status: 401 });
+      return NextResponse.json({ success: true, user });
     }
 
-    // 3. Admin: Fetch All Bookings
-    if (action === 'getAdminBookings') {
-      const bookings = await prisma.booking.findMany({
-        include: { ride: true },
-        orderBy: { createdAt: 'desc' },
+    // 3. KYC Verification (Submit Phone & WhatsApp No)
+    if (action === 'verifyKYC') {
+      const { userId, phone, whatsapp } = body;
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: { phone, whatsapp, kycVerified: true },
       });
-      return NextResponse.json({ success: true, bookings });
+      return NextResponse.json({ success: true, user: updatedUser });
     }
 
-    // 4. Admin: Approve or Reject Booking Slip
-    if (action === 'updateBookingStatus') {
-      const { bookingId, status } = body; // status = 'APPROVED' | 'REJECTED'
-      const updated = await prisma.booking.update({
-        where: { id: bookingId },
-        data: { status },
+    // 4. Update Passenger Profile (Education, Phone etc)
+    if (action === 'updateProfile') {
+      const { userId, education, phone } = body;
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: { education, phone },
       });
-      return NextResponse.json({ success: true, booking: updated });
+      return NextResponse.json({ success: true, user: updatedUser });
+    }
+
+    // 5. Real-time Live GPS Location Sync (Driver/Passenger Vehicle Movement)
+    if (action === 'updateLocation') {
+      const { userId, lat, lng } = body;
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: { currentLat: lat, currentLng: lng },
+      });
+      return NextResponse.json({ success: true, user: updatedUser });
+    }
+
+    // 6. Get Driver's Real-time Location for Passenger Map
+    if (action === 'getDriverLocation') {
+      const { driverId } = body;
+      const driver = await prisma.user.findUnique({
+        where: { id: driverId },
+        select: { currentLat: true, currentLng: true, firstName: true, phone: true },
+      });
+      return NextResponse.json({ success: true, driver });
     }
 
     return NextResponse.json({ success: false, message: 'Invalid Action' }, { status: 400 });
