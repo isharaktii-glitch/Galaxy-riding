@@ -1,74 +1,44 @@
-datasource db {
-  provider = "postgresql"
-  url      = "postgresql://neondb_owner:npg_OPqXZuJwDM86@ep-lively-smoke-b5jv1gt1-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-}
-
 generator client {
   provider = "prisma-client-js"
 }
 
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
 model User {
   id        String   @id @default(uuid())
-  phone     String   @unique
-  nic       String   @unique
-  fullName  String
-  role      Role     // DRIVER or PASSENGER
-  verified  Boolean  @default(false)
+  email     String   @unique
+  name      String?
+  role      String   @default("PASSENGER") // PASSENGER, DRIVER, ADMIN
   createdAt DateTime @default(now())
-
-  rides    Ride[]    @relation("DriverRides")
-  bookings Booking[]
+  bookings  Booking[]
 }
 
 model Ride {
-  id             String     @id @default(uuid())
-  driverId       String
-  driver         User       @relation("DriverRides", fields: [driverId], references: [id])
-  fromLocation   String
-  toLocation     String
-  fromLat        Float
-  fromLng        Float
-  toLat          Float
-  toLng          Float
-  departureTime  DateTime
-  availableSeats Int
-  pricePerSeat   Float
-  driverLat      Float?
-  driverLng      Float?
-  status         RideStatus @default(ACTIVE)
-
-  bookings Booking[]
+  id          String    @id @default(uuid())
+  title       String
+  driverName  String
+  price       Float
+  fromLocation String
+  toLocation  String
+  driverLat   Float
+  driverLng   Float
+  passengerLat Float
+  passengerLng Float
+  available   Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  bookings    Booking[]
 }
 
 model Booking {
-  id           String        @id @default(uuid())
-  rideId       String
-  ride         Ride          @relation(fields: [rideId], references: [id])
-  passengerId  String
-  passenger    User          @relation(fields: [passengerId], references: [id])
-  seatsBooked  Int           @default(1)
-  paymentSlip  String?       // Image URL or Base64 String
-  status       BookingStatus @default(PENDING_PAYMENT)
-  passengerLat Float?
-  passengerLng Float?
-  createdAt    DateTime      @default(now())
-}
-
-enum Role {
-  DRIVER
-  PASSENGER
-  ADMIN
-}
-
-enum RideStatus {
-  ACTIVE
-  FULL
-  COMPLETED
-  CANCELLED
-}
-
-enum BookingStatus {
-  PENDING_PAYMENT
-  APPROVED
-  REJECTED
+  id            String   @id @default(uuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  rideId        String
+  ride          Ride     @relation(fields: [rideId], references: [id])
+  paymentSlip   String?  // Image URL / Receipt Slip Base64 or Text
+  status        String   @default("PENDING_APPROVAL") // PENDING_APPROVAL, APPROVED, REJECTED
+  createdAt     DateTime @default(now())
 }
