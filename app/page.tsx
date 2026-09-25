@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 
-// SSR ප්‍රශ්න නැතිවීමට Leaflet Map එක dynamic import කිරීම
-const LiveMap = dynamic(() => import('@/components/LiveMap'), {
+// SSR and Path alias fix for Next.js
+const LiveMap = dynamic(() => import('../components/LiveMap'), {
   ssr: false,
   loading: () => (
     <div style={{ height: '350px', width: '100%', backgroundColor: '#f1f5f9', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
