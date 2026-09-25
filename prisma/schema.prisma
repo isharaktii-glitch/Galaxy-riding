@@ -8,37 +8,31 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  role      String   @default("PASSENGER") // PASSENGER, DRIVER, ADMIN
-  createdAt DateTime @default(now())
-  bookings  Booking[]
-}
-
-model Ride {
-  id          String    @id @default(uuid())
-  title       String
-  driverName  String
-  price       Float
-  fromLocation String
-  toLocation  String
-  driverLat   Float
-  driverLng   Float
-  passengerLat Float
-  passengerLng Float
-  available   Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  bookings    Booking[]
+  id            String    @id @default(uuid())
+  firstName     String
+  lastName      String
+  email         String    @unique
+  password      String
+  role          String    // "PASSENGER" or "DRIVER"
+  phone         String?
+  whatsapp      String?
+  education     String?   // Passenger Profile Details
+  kycVerified   Boolean   @default(false)
+  currentLat    Float?    // Live GPS Location
+  currentLng    Float?    
+  createdAt     DateTime  @default(now())
+  bookings      Booking[]
 }
 
 model Booking {
   id            String   @id @default(uuid())
-  userId        String?
-  user          User?    @relation(fields: [userId], references: [id])
-  rideId        String
-  ride          Ride     @relation(fields: [rideId], references: [id])
-  paymentSlip   String?  // Image URL / Receipt Slip Base64 or Text
-  status        String   @default("PENDING_APPROVAL") // PENDING_APPROVAL, APPROVED, REJECTED
+  passengerId   String
+  driverId      String?
+  passenger     User     @relation(fields: [passengerId], references: [id])
+  pickupLat     Float
+  pickupLng     Float
+  destLat       Float
+  destLng       Float
+  status        String   @default("SEARCHING") // SEARCHING, ACCEPTED, COMPLETED
   createdAt     DateTime @default(now())
 }
