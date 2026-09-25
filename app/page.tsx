@@ -22,97 +22,62 @@ const DynamicPopup = dynamic(
 
 import 'leaflet/dist/leaflet.css';
 
-interface RideOption {
-  id?: string;
-  type: string;
-  price: string;
-  time: string;
-  driverName: string;
-  rating: string;
-  icon: string;
-}
-
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('Colombo to Kandy');
   const [loading, setLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [rideOptions, setRideOptions] = useState<RideOption[]>([]);
-  const [selectedRide, setSelectedRide] = useState<RideOption | null>(null);
-  const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [rideOptions, setRideOptions] = useState<any[]>([]);
+  const [selectedRide, setSelectedRide] = useState<any | null>(null);
+  const [slipText, setSlipText] = useState('');
+  const [bookingStatus, setBookingStatus] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Real Database Search Request via backend API (/api/v1)
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
-
     setLoading(true);
-    setHasSearched(false);
     setSelectedRide(null);
-    setBookingSuccess(false);
+    setBookingStatus(null);
 
     try {
-      const response = await fetch('/api/v1', {
+      const res = await fetch('/api/v1', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'searchRides', query: searchQuery }),
       });
-
-      const data = await response.json();
-
-      if (data.success && data.rides && data.rides.length > 0) {
+      const data = await res.json();
+      if (data.success) {
         setRideOptions(data.rides);
-      } else {
-        // Database එකේ Data නැතිනම් Auto-Fallback to default live options
-        setRideOptions([
-          { id: '1', type: 'Galaxy Economy', price: 'LKR 4,500', time: '2 hrs 45 mins', driverName: 'Saman Perera', rating: '★ 4.9', icon: '🚗' },
-          { id: '2', type: 'Galaxy Comfort', price: 'LKR 6,200', time: '2 hrs 30 mins', driverName: 'Kamal Silva', rating: '★ 4.8', icon: '🚘' },
-          { id: '3', type: 'Galaxy Premium VIP', price: 'LKR 9,500', time: '2 hrs 15 mins', driverName: 'Nimal Fernando', rating: '★ 5.0', icon: '🚖' },
-        ]);
       }
     } catch (err) {
-      console.error('API Fetch Error:', err);
-      // Network Fallback Options
-      setRideOptions([
-        { id: '1', type: 'Galaxy Economy', price: 'LKR 4,500', time: '2 hrs 45 mins', driverName: 'Saman Perera', rating: '★ 4.9', icon: '🚗' },
-        { id: '2', type: 'Galaxy Comfort', price: 'LKR 6,200', time: '2 hrs 30 mins', driverName: 'Kamal Silva', rating: '★ 4.8', icon: '🚘' },
-      ]);
+      console.error(err);
     } finally {
       setLoading(false);
-      setHasSearched(true);
     }
   };
 
-  // Real Booking Action with Neon DB Save
-  const handleBooking = async () => {
-    if (!selectedRide) return;
+  const handleBookWithSlip = async () => {
+    if (!selectedRide || !slipText) return alert('Please attach payment slip details or receipt reference!');
 
     setLoading(true);
     try {
-      const response = await fetch('/api/v1', {
+      const res = await fetch('/api/v1', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'createBooking',
-          rideId: selectedRide.id || '1',
-          rideType: selectedRide.type,
-          price: selectedRide.price,
-          passengerName: 'Passenger User',
+          rideId: selectedRide.id,
+          slipData: slipText,
         }),
       });
-
-      const data = await response.json();
+      const data = await res.json();
       if (data.success) {
-        setBookingSuccess(true);
-      } else {
-        setBookingSuccess(true); // Fallback Success feedback
+        setBookingStatus('PENDING_APPROVAL');
       }
-    } catch (error) {
-      setBookingSuccess(true);
+    } catch (e) {
+      alert('Booking Failed');
     } finally {
       setLoading(false);
     }
@@ -120,146 +85,93 @@ export default function HomePage() {
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'system-ui, sans-serif' }}>
-      {/* Title Header */}
       <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', color: '#0f172a', fontWeight: 'bold' }}>
-          🚀 Galaxy Rides AI
-        </h1>
-        <p style={{ color: '#64748b', fontSize: '14px', marginTop: '6px' }}>
-          ඔබට යන්න ඕන තැන Type කරන්න (e.g., "Colombo to Kandy tomorrow morning")
-        </p>
+        <h1 style={{ fontSize: '28px', color: '#0f172a', fontWeight: 'bold' }}>🚀 Galaxy Rides AI</h1>
+        <p style={{ color: '#64748b', fontSize: '14px' }}>AI-Powered Natural Route Booking & Live GPS</p>
       </div>
 
-      {/* Search Input Form */}
       <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Where do you want to go?"
-          style={{
-            flex: 1,
-            padding: '14px 18px',
-            borderRadius: '10px',
-            border: '1px solid #cbd5e1',
-            fontSize: '15px',
-            outline: 'none',
-          }}
+          style={{ flex: 1, padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1' }}
         />
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            padding: '14px 28px',
-            backgroundColor: '#2563eb',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '10px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            fontSize: '15px',
-          }}
-        >
+        <button type="submit" disabled={loading} style={{ padding: '14px 24px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
           {loading ? 'Searching...' : 'Search'}
         </button>
       </form>
 
-      {/* Interactive Map */}
+      {/* Live Map */}
       <div style={{ height: '350px', width: '100%', borderRadius: '12px', overflow: 'hidden', border: '1px solid #cbd5e1', marginBottom: '24px' }}>
         {isClient ? (
           /* @ts-ignore */
-          <DynamicMapContainer center={[6.9271, 79.8612]} zoom={11} style={{ height: '100%', width: '100%' }}>
+          <DynamicMapContainer center={[6.9271, 79.8612]} zoom={10} style={{ height: '100%', width: '100%' }}>
             {/* @ts-ignore */}
             <DynamicTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             {/* @ts-ignore */}
             <DynamicMarker position={[6.9271, 79.8612]}>
               {/* @ts-ignore */}
-              <DynamicPopup>🚗 Pickup Point (Colombo)</DynamicPopup>
+              <DynamicPopup>🚗 Driver Location</DynamicPopup>
             </DynamicMarker>
           </DynamicMapContainer>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', backgroundColor: '#f1f5f9' }}>
-            🗺️ Loading Map...
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', backgroundColor: '#f1f5f9' }}>🗺️ Loading Map...</div>
         )}
       </div>
 
-      {/* Search Results */}
-      {hasSearched && (
-        <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginBottom: '14px' }}>
-            Available Rides Found:
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {rideOptions.map((ride, index) => (
-              <div
-                key={index}
-                onClick={() => {
-                  setSelectedRide(ride);
-                  setBookingSuccess(false);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px',
-                  borderRadius: '12px',
-                  border: selectedRide?.type === ride.type ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                  backgroundColor: selectedRide?.type === ride.type ? '#eff6ff' : '#ffffff',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <span style={{ fontSize: '28px' }}>{ride.icon}</span>
-                  <div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>{ride.type}</h3>
-                    <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
-                      Driver: {ride.driverName} • {ride.rating}
-                    </p>
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#059669', margin: 0 }}>{ride.price}</p>
-                  <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>{ride.time}</p>
-                </div>
+      {/* Available Options */}
+      {rideOptions.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {rideOptions.map((ride) => (
+            <div
+              key={ride.id}
+              onClick={() => setSelectedRide(ride)}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: '16px',
+                borderRadius: '12px',
+                border: selectedRide?.id === ride.id ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                backgroundColor: selectedRide?.id === ride.id ? '#eff6ff' : '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px' }}>{ride.title || ride.type}</h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>Driver: {ride.driverName}</p>
               </div>
-            ))}
-          </div>
+              <p style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#059669' }}>LKR {ride.price}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
-          {/* Booking Card & Receipt Flow */}
-          {selectedRide && (
-            <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
-              {!bookingSuccess ? (
-                <>
-                  <p style={{ fontSize: '15px', color: '#334155', marginBottom: '12px' }}>
-                    Selected Ride: <strong>{selectedRide.type}</strong> ({selectedRide.price})
-                  </p>
-                  <button
-                    onClick={handleBooking}
-                    disabled={loading}
-                    style={{
-                      width: '100%',
-                      padding: '14px',
-                      backgroundColor: '#16a34a',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      fontWeight: 'bold',
-                      fontSize: '16px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {loading ? 'Processing Booking...' : 'Confirm & Book Ride Now'}
-                  </button>
-                </>
-              ) : (
-                <div style={{ padding: '10px', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '8px' }}>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '18px' }}>🎉 Booking Confirmed!</h3>
-                  <p style={{ margin: 0, fontSize: '14px' }}>
-                    Your booking slip for <strong>{selectedRide.type}</strong> has been saved. The driver ({selectedRide.driverName}) will contact you shortly!
-                  </p>
-                </div>
-              )}
+      {/* Slip Upload & Booking Approval */}
+      {selectedRide && (
+        <div style={{ marginTop: '24px', padding: '20px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+          {!bookingStatus ? (
+            <>
+              <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>Upload Payment Slip / Reference:</h3>
+              <input
+                type="text"
+                placeholder="Enter Slip Ref / Bank Transfer Details"
+                value={slipText}
+                onChange={(e) => setSlipText(e.target.value)}
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '12px' }}
+              />
+              <button
+                onClick={handleBookWithSlip}
+                disabled={loading}
+                style={{ width: '100%', padding: '14px', backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Submit Slip & Confirm Booking
+              </button>
+            </>
+          ) : (
+            <div style={{ padding: '12px', backgroundColor: '#fef3c7', color: '#92400e', borderRadius: '8px', textAlign: 'center' }}>
+              ⏳ <strong>Booking Submitted!</strong> Waiting for Admin Approval. You can check status on Admin Panel or wait for confirmation.
             </div>
           )}
         </div>
