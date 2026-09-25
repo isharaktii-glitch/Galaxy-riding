@@ -6,35 +6,63 @@ const prisma = new PrismaClient();
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, query, rideType, price, passengerName } = body;
+    const { action } = body;
 
-    // Search Rides from DB or Return Dynamic Rides
+    // 1. Natural Language / Route Search
     if (action === 'searchRides') {
-      const rides = [
-        { id: '1', type: 'Galaxy Economy', price: 'LKR 4,500', time: '2 hrs 45 mins', driverName: 'Saman Perera', rating: '★ 4.9', icon: '🚗' },
-        { id: '2', type: 'Galaxy Comfort', price: 'LKR 6,200', time: '2 hrs 30 mins', driverName: 'Kamal Silva', rating: '★ 4.8', icon: '🚘' },
-        { id: '3', type: 'Galaxy Premium VIP', price: 'LKR 9,500', time: '2 hrs 15 mins', driverName: 'Nimal Fernando', rating: '★ 5.0', icon: '🚖' },
-      ];
+      const { query } = body;
+      const rides = await prisma.ride.findMany({
+        where: { available: true },
+      });
 
-      return NextResponse.json({ success: true, query, rides });
+      // If DB is empty, return initial fallback seed options
+      if (rides.length === 0) {
+        return NextResponse.json({
+          success: true,
+          rides: [
+            { id: '1', title: 'Galaxy Economy', price: 4500, driverName: 'Saman Perera', fromLocation: 'Colombo', toLocation: 'Kandy', driverLat: 6.9271, driverLng: 79.8612, passengerLat: 7.2906, passengerLng: 80.6337 },
+            { id: '2', title: 'Galaxy Comfort VIP', price: 6500, driverName: 'Kamal Silva', fromLocation: 'Colombo', toLocation: 'Kandy', driverLat: 6.9300, driverLng: 79.8650, passengerLat: 7.2906, passengerLng: 80.6337 }
+          ]
+        });
+      }
+      return NextResponse.json({ success: true, rides });
     }
 
-    // Save Booking in Database
+    // 2. Passenger Booking Submission + Slip Upload
     if (action === 'createBooking') {
-      return NextResponse.json({
-        success: true,
-        message: 'Booking saved successfully',
-        booking: {
-          rideType,
-          price,
-          passengerName: passengerName || 'Passenger',
+      const { rideId, slipData, passengerEmail } = body;
+      
+      const newBooking = await prisma.booking.create({
+        data: {
+          rideId: rideId || '1',
+          paymentSlip: slipData || 'Receipt_Uploaded_Placeholder',
           status: 'PENDING_APPROVAL',
-          createdAt: new Date().toISOString(),
         },
       });
+
+      return NextResponse.json({ success: true, booking: newBooking });
     }
 
-    return NextResponse.json({ success: false, message: 'Invalid action' }, { status: 400 });
+    // 3. Admin: Fetch All Bookings
+    if (action === 'getAdminBookings') {
+      const bookings = await prisma.booking.findMany({
+        include: { ride: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      return NextResponse.json({ success: true, bookings });
+    }
+
+    // 4. Admin: Approve or Reject Booking Slip
+    if (action === 'updateBookingStatus') {
+      const { bookingId, status } = body; // status = 'APPROVED' | 'REJECTED'
+      const updated = await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status },
+      });
+      return NextResponse.json({ success: true, booking: updated });
+    }
+
+    return NextResponse.json({ success: false, message: 'Invalid Action' }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
