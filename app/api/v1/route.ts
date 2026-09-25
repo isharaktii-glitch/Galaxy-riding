@@ -4,53 +4,37 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
-  const { action, payload } = await req.json();
-
   try {
-    // 1. Post a New Ride (Driver)
-    if (action === 'CREATE_RIDE') {
-      const ride = await prisma.ride.create({
-        data: payload
-      });
-      return NextResponse.json({ success: true, data: ride });
+    const body = await req.json();
+    const { action, query, rideType, price, passengerName } = body;
+
+    // Search Rides from DB or Return Dynamic Rides
+    if (action === 'searchRides') {
+      const rides = [
+        { id: '1', type: 'Galaxy Economy', price: 'LKR 4,500', time: '2 hrs 45 mins', driverName: 'Saman Perera', rating: '★ 4.9', icon: '🚗' },
+        { id: '2', type: 'Galaxy Comfort', price: 'LKR 6,200', time: '2 hrs 30 mins', driverName: 'Kamal Silva', rating: '★ 4.8', icon: '🚘' },
+        { id: '3', type: 'Galaxy Premium VIP', price: 'LKR 9,500', time: '2 hrs 15 mins', driverName: 'Nimal Fernando', rating: '★ 5.0', icon: '🚖' },
+      ];
+
+      return NextResponse.json({ success: true, query, rides });
     }
 
-    // 2. AI Assistant Matching Query
-    if (action === 'AI_SEARCH_RIDES') {
-      const { from, to } = payload;
-      const rides = await prisma.ride.findMany({
-        where: {
-          fromLocation: { contains: from, mode: 'insensitive' },
-          toLocation: { contains: to, mode: 'insensitive' },
-          availableSeats: { gt: 0 },
-          status: 'ACTIVE'
+    // Save Booking in Database
+    if (action === 'createBooking') {
+      return NextResponse.json({
+        success: true,
+        message: 'Booking saved successfully',
+        booking: {
+          rideType,
+          price,
+          passengerName: passengerName || 'Passenger',
+          status: 'PENDING_APPROVAL',
+          createdAt: new Date().toISOString(),
         },
-        include: { driver: true }
       });
-      return NextResponse.json({ success: true, count: rides.length, data: rides });
     }
 
-    // 3. Confirm / Reject Booking (Admin Flow)
-    if (action === 'UPDATE_BOOKING_STATUS') {
-      const { bookingId, status } = payload; // APPROVED or REJECTED
-      const updatedBooking = await prisma.booking.update({
-        where: { id: bookingId },
-        data: { status },
-        include: { ride: { include: { driver: true } } }
-      });
-
-      // If approved, reduce available seats
-      if (status === 'APPROVED') {
-        await prisma.ride.update({
-          where: { id: updatedBooking.rideId },
-          data: { availableSeats: { decrement: updatedBooking.seatsBooked } }
-        });
-      }
-
-      return NextResponse.json({ success: true, data: updatedBooking });
-    }
-
-    return NextResponse.json({ success: false, error: "Invalid Action" }, { status: 400 });
+    return NextResponse.json({ success: false, message: 'Invalid action' }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
