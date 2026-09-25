@@ -234,7 +234,7 @@ export default function App() {
         {/* @ts-ignore */}
         <DynamicMapContainer center={[driverGPS.lat, driverGPS.lng]} zoom={12} style={{ height: '100vh', width: '100vw' }}>
           {/* @ts-ignore */}
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <DynamicTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {/* @ts-ignore */}
           <DynamicMarker position={[driverGPS.lat, driverGPS.lng]}>
             {/* @ts-ignore */}
@@ -259,7 +259,9 @@ export default function App() {
         background: 'rgba(15, 23, 42, 0.8)',
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        sticky: 'top'
+        position: 'sticky',
+        top: 0,
+        zIndex: 100
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '28px' }}>🚀</span>
@@ -335,7 +337,7 @@ export default function App() {
           {/* @ts-ignore */}
           <DynamicMapContainer center={[driverGPS.lat, driverGPS.lng]} zoom={10} style={{ height: '100%', width: '100%' }}>
             {/* @ts-ignore */}
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <DynamicTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             {/* @ts-ignore */}
             <DynamicMarker position={[driverGPS.lat, driverGPS.lng]}>
               {/* @ts-ignore */}
