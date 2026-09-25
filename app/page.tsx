@@ -1,17 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
-// SSR and Path alias fix for Next.js
-const LiveMap = dynamic(() => import('../components/LiveMap'), {
-  ssr: false,
-  loading: () => (
-    <div style={{ height: '350px', width: '100%', backgroundColor: '#f1f5f9', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-      🗺️ Loading Interactive Map...
-    </div>
-  ),
-});
+// Leaflet Dynamic Import to prevent SSR crashes
+const DynamicMapContainer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.MapContainer),
+  { ssr: false }
+);
+const DynamicTileLayer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.TileLayer),
+  { ssr: false }
+);
+const DynamicMarker = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Marker),
+  { ssr: false }
+);
+const DynamicPopup = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Popup),
+  { ssr: false }
+);
+
+import 'leaflet/dist/leaflet.css';
 
 interface RideOption {
   type: string;
@@ -28,10 +38,11 @@ export default function HomePage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [rideOptions, setRideOptions] = useState<RideOption[]>([]);
   const [selectedRide, setSelectedRide] = useState<RideOption | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
-  // Mock Coordinates for Colombo to Kandy
-  const driverLocation = { lat: 6.9271, lng: 79.8612 }; // Colombo
-  const passengerLocation = { lat: 7.2906, lng: 80.6337 }; // Kandy
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +52,6 @@ export default function HomePage() {
     setHasSearched(false);
     setSelectedRide(null);
 
-    // AI/Search Simulation
     setTimeout(() => {
       setRideOptions([
         { type: 'Galaxy Economy', price: 'LKR 4,500', time: '2 hrs 45 mins', driverName: 'Saman Perera', rating: '★ 4.9', icon: '🚗' },
@@ -54,10 +64,10 @@ export default function HomePage() {
   };
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'system-ui, sans-serif' }}>
       {/* Title Header */}
       <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', color: '#0f172a', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+        <h1 style={{ fontSize: '28px', color: '#0f172a', fontWeight: 'bold' }}>
           🚀 Galaxy Rides AI
         </h1>
         <p style={{ color: '#64748b', fontSize: '14px', marginTop: '6px' }}>
@@ -79,7 +89,6 @@ export default function HomePage() {
             border: '1px solid #cbd5e1',
             fontSize: '15px',
             outline: 'none',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
           }}
         />
         <button
@@ -94,16 +103,30 @@ export default function HomePage() {
             fontWeight: 'bold',
             cursor: 'pointer',
             fontSize: '15px',
-            transition: 'background 0.2s',
           }}
         >
           {loading ? 'Searching...' : 'Search'}
         </button>
       </form>
 
-      {/* Interactive Map */}
-      <div style={{ marginBottom: '24px' }}>
-        <LiveMap driverCoords={driverLocation} passengerCoords={passengerLocation} />
+      {/* Embedded Live Map */}
+      <div style={{ height: '350px', width: '100%', borderRadius: '12px', overflow: 'hidden', border: '1px solid #cbd5e1', marginBottom: '24px' }}>
+        {isClient ? (
+          /* @ts-ignore */
+          <DynamicMapContainer center={[6.9271, 79.8612]} zoom={11} style={{ height: '100%', width: '100%' }}>
+            {/* @ts-ignore */}
+            <DynamicTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            {/* @ts-ignore */}
+            <DynamicMarker position={[6.9271, 79.8612]}>
+              {/* @ts-ignore */}
+              <DynamicPopup>🚗 Colombo Pickup</DynamicPopup>
+            </DynamicMarker>
+          </DynamicMapContainer>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', backgroundColor: '#f1f5f9' }}>
+            🗺️ Loading Map...
+          </div>
+        )}
       </div>
 
       {/* Search Results */}
@@ -126,7 +149,6 @@ export default function HomePage() {
                   border: selectedRide?.type === ride.type ? '2px solid #2563eb' : '1px solid #e2e8f0',
                   backgroundColor: selectedRide?.type === ride.type ? '#eff6ff' : '#ffffff',
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -146,7 +168,7 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* Book Now Action Card */}
+          {/* Book Now Card */}
           {selectedRide && (
             <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
               <p style={{ fontSize: '15px', color: '#334155', marginBottom: '12px' }}>
