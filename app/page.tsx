@@ -19,10 +19,25 @@ const DynamicPopup = dynamic(
   () => import('react-leaflet').then((mod) => mod.Popup),
   { ssr: false }
 );
+const MapFlyToController = dynamic(
+  () =>
+    import('react-leaflet').then((mod) => {
+      const { useMap } = mod;
+      return function MapFlyTo({ center }: { center: [number, number] }) {
+        const map = useMap();
+        useEffect(() => {
+          if (center) {
+            map.flyTo(center, 15, { duration: 1.5 });
+          }
+        }, [center, map]);
+        return null;
+      };
+    }),
+  { ssr: false }
+);
 
 import 'leaflet/dist/leaflet.css';
 
-// Haversine Distance Calculation (KM)
 function calculateDistanceKM(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -69,13 +84,14 @@ export default function App() {
 
   // Driver Creation State
   const [startLoc, setStartLoc] = useState('Colombo');
-  const [destQuery, setDestQuery] = useState('Kandy');
+  const [destQuery, setDestQuery] = useState('Temple of the Tooth Kandy');
   const [vehicle, setVehicle] = useState('Toyota Axio VIP');
   const [vehicleCat, setVehicleCat] = useState<'CAR' | 'BUS' | 'LORRY' | 'BIKE' | 'CLASSIC'>('CAR');
   const [price, setPrice] = useState('3500');
   const [seats, setSeats] = useState('3');
-  const [postLat, setPostLat] = useState<number>(7.2906); // Default Kandy
-  const [postLng, setPostLng] = useState<number>(80.6337);
+  const [postLat, setPostLat] = useState<number>(7.2936); // Default Temple of Tooth Lat
+  const [postLng, setPostLng] = useState<number>(80.6413); // Default Temple of Tooth Lng
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
 
   // Driver & Passenger Posts Storage
   const [driverPosts, setDriverPosts] = useState<DriverPost[]>([]);
@@ -87,7 +103,6 @@ export default function App() {
   const [passengerLiveGPS, setPassengerLiveGPS] = useState<{ lat: number; lng: number } | null>(null);
   const [activeBookedRide, setActiveBookedRide] = useState<DriverPost | null>(null);
 
-  // Initialize Data
   useEffect(() => {
     const savedUser = localStorage.getItem('galaxy_user');
     if (savedUser) setUser(JSON.parse(savedUser));
@@ -106,49 +121,13 @@ export default function App() {
           price: '3800',
           availableSeats: '3 Seats',
           startLocationName: 'Colombo Fort',
-          endLocationName: 'Kandy',
+          endLocationName: 'Temple of the Tooth, Kandy',
           startLat: 6.9344,
           startLng: 79.8428,
-          endLat: 7.2906,
-          endLng: 80.6337,
+          endLat: 7.2936,
+          endLng: 80.6413,
           currentLat: 6.9271,
           currentLng: 79.8612,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'POST-102',
-          driverName: 'Sarath Perera',
-          driverPhone: '0714455667',
-          vehicleType: 'Isuzu Elf Lorry (Return Load)',
-          vehicleCategory: 'LORRY',
-          price: '8000',
-          availableSeats: 'Full Cargo Space',
-          startLocationName: 'Kurunegala',
-          endLocationName: 'Galle',
-          startLat: 7.4863,
-          startLng: 80.3623,
-          endLat: 6.0535,
-          endLng: 80.221,
-          currentLat: 7.4863,
-          currentLng: 80.3623,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'POST-103',
-          driverName: 'Saman Kumara',
-          driverPhone: '0751122334',
-          vehicleType: 'Datsun B211 (Classic Budget)',
-          vehicleCategory: 'CLASSIC',
-          price: '2000',
-          availableSeats: '2 Seats',
-          startLocationName: 'Gampaha',
-          endLocationName: 'Colombo',
-          startLat: 7.0873,
-          startLng: 79.998,
-          endLat: 6.9271,
-          endLng: 79.8612,
-          currentLat: 7.0873,
-          currentLng: 79.998,
           createdAt: new Date().toISOString(),
         },
       ];
@@ -157,26 +136,10 @@ export default function App() {
     }
   }, []);
 
-  // Live GPS Watch
-  useEffect(() => {
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          setPassengerLiveGPS({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          });
-        },
-        () => console.log('Location access waiting...'),
-        { enableHighAccuracy: true }
-      );
-      return () => navigator.geolocation.clearWatch(watchId);
-    }
-  }, []);
-
-  // Google Maps Style Fly-To Location Lookup
+  // Location Fly-To Search Function
   const searchLocationAndFly = async (queryName: string, isDriver: boolean) => {
-    if (!queryName || queryName.length < 2) return;
+    if (!queryName || queryName.trim().length < 2) return;
+    setIsSearchingLocation(true);
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryName)}`
@@ -192,13 +155,16 @@ export default function App() {
           setPassengerDestLat(lat);
           setPassengerDestLng(lng);
         }
+      } else {
+        alert('ස්ථානය සොයාගැනීමට නොහැකි විය. වෙනත් නමක් type කරන්න.');
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      setIsSearchingLocation(false);
     }
   };
 
-  // Auth Handler
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const userData = {
@@ -213,7 +179,6 @@ export default function App() {
     setUser(userData);
   };
 
-  // Driver Post Publisher
   const handlePublishPost = (e: React.FormEvent) => {
     e.preventDefault();
     if (!destQuery) return alert('කරුණාකර ගමනාන්තයක් ඇතුළත් කරන්න!');
@@ -243,7 +208,6 @@ export default function App() {
     alert('🚀 Driver Route Post එක සාර්ථකව පලකරන ලදී!');
   };
 
-  // Passenger Dynamic Smart Filter
   const matchedDriverPosts = useMemo(() => {
     if (!passengerDestQuery) return driverPosts;
 
@@ -262,73 +226,48 @@ export default function App() {
           post.endLat,
           post.endLng
         );
-        if (dist <= 15) radiusMatch = true; // 15KM Nearby Radius Match
+        if (dist <= 15) radiusMatch = true;
       }
 
-      // Hide expired driver posts (if driver passed passenger by > 2km)
-      let isExpired = false;
-      if (passengerLiveGPS) {
-        const distFromDriver = calculateDistanceKM(
-          post.currentLat,
-          post.currentLng,
-          passengerLiveGPS.lat,
-          passengerLiveGPS.lng
-        );
-        const distFromStart = calculateDistanceKM(
-          post.startLat,
-          post.startLng,
-          passengerLiveGPS.lat,
-          passengerLiveGPS.lng
-        );
-
-        if (distFromDriver > distFromStart && distFromDriver > 2) {
-          isExpired = true;
-        }
-      }
-
-      return (nameMatch || radiusMatch) && !isExpired;
+      return nameMatch || radiusMatch;
     });
-  }, [passengerDestQuery, passengerDestLat, passengerDestLng, driverPosts, passengerLiveGPS]);
+  }, [passengerDestQuery, passengerDestLat, passengerDestLng, driverPosts]);
 
-  // Logout
   const logout = () => {
     localStorage.removeItem('galaxy_user');
     setUser(null);
   };
 
-  // LOGIN / SIGNUP UI
   if (!user) {
     return (
       <div style={container3DStyle}>
         <div style={glassCardStyle}>
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <h1 style={{ color: '#38bdf8', margin: '0 0 6px 0', fontSize: '28px', fontWeight: '800', letterSpacing: '-0.5px' }}>
+            <h1 style={{ color: '#38bdf8', margin: '0 0 6px 0', fontSize: '28px', fontWeight: '800' }}>
               🌌 Galaxy Rides 3D
             </h1>
             <p style={{ color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              AI-Driven Multi-Modal Ride & Logistics Platform
+              AI-Driven Multi-Modal Ride Platform
             </p>
           </div>
 
-          {/* LOGIN / SIGNUP TAB SWITCHER */}
           <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.8)', padding: '4px', borderRadius: '12px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
             <button
               type="button"
               onClick={() => setAuthMode('LOGIN')}
-              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: authMode === 'LOGIN' ? '#0284c7' : 'transparent', color: '#fff', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' }}
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: authMode === 'LOGIN' ? '#0284c7' : 'transparent', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
             >
               🔑 Login
             </button>
             <button
               type="button"
               onClick={() => setAuthMode('SIGNUP')}
-              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: authMode === 'SIGNUP' ? '#0284c7' : 'transparent', color: '#fff', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' }}
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: authMode === 'SIGNUP' ? '#0284c7' : 'transparent', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
             >
               📝 Sign Up
             </button>
           </div>
 
-          {/* ROLE SELECTOR */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
             <button
               type="button"
@@ -346,7 +285,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* AUTH FORM */}
           <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {authMode === 'SIGNUP' && (
               <>
@@ -396,10 +334,8 @@ export default function App() {
     );
   }
 
-  // MAIN PLATFORM INTERFACE
   return (
     <div style={{ minHeight: '100vh', background: '#020617', color: '#e2e8f0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      {/* NAVBAR */}
       <nav style={{ padding: '16px 24px', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#38bdf8' }}>🌌 Galaxy Rides 3D</span>
@@ -422,8 +358,20 @@ export default function App() {
               <div style={{ display: 'flex', gap: '10px' }}>
                 <input type="text" placeholder="Start City (e.g. Colombo)" value={startLoc} onChange={(e) => setStartLoc(e.target.value)} style={input3DStyle} />
                 <div style={{ display: 'flex', flex: 1, gap: '6px' }}>
-                  <input type="text" placeholder="Destination City (e.g. Kandy)" value={destQuery} onChange={(e) => setDestQuery(e.target.value)} style={input3DStyle} />
-                  <button type="button" onClick={() => searchLocationAndFly(destQuery, true)} style={{ padding: '0 14px', background: '#0284c7', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>Fly Map</button>
+                  <input
+                    type="text"
+                    placeholder="Ending Location (e.g. Temple of Tooth Kandy)"
+                    value={destQuery}
+                    onChange={(e) => setDestQuery(e.target.value)}
+                    style={input3DStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => searchLocationAndFly(destQuery, true)}
+                    style={{ padding: '0 16px', background: '#0284c7', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 'bold', cursor: 'pointer', minWidth: '90px' }}
+                  >
+                    {isSearchingLocation ? 'Flying...' : '✈️ Fly Map'}
+                  </button>
                 </div>
               </div>
 
@@ -440,16 +388,29 @@ export default function App() {
                 <input type="text" placeholder="Price (LKR)" value={price} onChange={(e) => setPrice(e.target.value)} style={input3DStyle} />
               </div>
 
-              {/* DYNAMIC MAP VIEW */}
-              <div style={{ height: '260px', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(56, 189, 248, 0.3)', marginTop: '6px' }}>
+              {/* DYNAMIC AUTO-FLY MAP VIEW */}
+              <div style={{ height: '280px', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(56, 189, 248, 0.4)', marginTop: '6px', position: 'relative' }}>
                 {/* @ts-ignore */}
-                <DynamicMapContainer center={[postLat, postLng]} zoom={12} style={{ height: '100%', width: '100%' }}>
+                <DynamicMapContainer center={[postLat, postLng]} zoom={15} style={{ height: '100%', width: '100%' }}>
                   {/* @ts-ignore */}
                   <DynamicTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   {/* @ts-ignore */}
-                  <DynamicMarker position={[postLat, postLng]} draggable={true}>
+                  <MapFlyToController center={[postLat, postLng]} />
+                  {/* @ts-ignore */}
+                  <DynamicMarker
+                    position={[postLat, postLng]}
+                    draggable={true}
+                    eventHandlers={{
+                      dragend: (e: any) => {
+                        const marker = e.target;
+                        const position = marker.getLatLng();
+                        setPostLat(position.lat);
+                        setPostLng(position.lng);
+                      },
+                    }}
+                  >
                     {/* @ts-ignore */}
-                    <DynamicPopup>📍 Destination Target Location</DynamicPopup>
+                    <DynamicPopup>📍 Target Destination Pin ({destQuery})</DynamicPopup>
                   </DynamicMarker>
                 </DynamicMapContainer>
               </div>
@@ -535,33 +496,21 @@ export default function App() {
                 </div>
               </div>
 
-              {/* MUTUAL LIVE GPS TRACKING MAP */}
               {activeBookedRide?.id === post.id && (
                 <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '12px', border: '1px solid #10b981' }}>
                   <p style={{ color: '#34d399', fontSize: '13px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
                     📍 Real-Time Mutual Live GPS Tracking Enabled
                   </p>
-
                   <div style={{ height: '240px', borderRadius: '10px', overflow: 'hidden' }}>
                     {/* @ts-ignore */}
-                    <DynamicMapContainer center={[post.currentLat, post.currentLng]} zoom={11} style={{ height: '100%', width: '100%' }}>
+                    <DynamicMapContainer center={[post.endLat, post.endLng]} zoom={14} style={{ height: '100%', width: '100%' }}>
                       {/* @ts-ignore */}
                       <DynamicTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      {/* Driver Position */}
                       {/* @ts-ignore */}
-                      <DynamicMarker position={[post.currentLat, post.currentLng]}>
+                      <DynamicMarker position={[post.endLat, post.endLng]}>
                         {/* @ts-ignore */}
-                        <DynamicPopup>🚗 Driver Live GPS ({post.driverName})</DynamicPopup>
+                        <DynamicPopup>🏁 Target Destination ({post.endLocationName})</DynamicPopup>
                       </DynamicMarker>
-
-                      {/* Passenger Position */}
-                      {passengerLiveGPS && (
-                        /* @ts-ignore */
-                        <DynamicMarker position={[passengerLiveGPS.lat, passengerLiveGPS.lng]}>
-                          {/* @ts-ignore */}
-                          <DynamicPopup>🧍 Your Live Location</DynamicPopup>
-                        </DynamicMarker>
-                      )}
                     </DynamicMapContainer>
                   </div>
                 </div>
@@ -574,7 +523,6 @@ export default function App() {
   );
 }
 
-// 3D STYLES & GLASSMORPHISM
 const container3DStyle: React.CSSProperties = {
   minHeight: '100vh',
   background: 'radial-gradient(circle at center, #0f172a 0%, #020617 100%)',
