@@ -400,7 +400,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: '#020617', color: '#e2e8f0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       {/* NAVBAR */}
-      <nav style={{ padding: '16px 24px', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', stickyTop: 0, zIndex: 100 }}>
+      <nav style={{ padding: '16px 24px', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#38bdf8' }}>🌌 Galaxy Rides 3D</span>
           <span style={{ fontSize: '10px', background: '#0284c7', color: '#fff', padding: '2px 8px', borderRadius: '20px', fontWeight: 'bold' }}>LIVE</span>
@@ -541,6 +541,7 @@ export default function App() {
                   <p style={{ color: '#34d399', fontSize: '13px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
                     📍 Real-Time Mutual Live GPS Tracking Enabled
                   </p>
+
                   <div style={{ height: '240px', borderRadius: '10px', overflow: 'hidden' }}>
                     {/* @ts-ignore */}
                     <DynamicMapContainer center={[post.currentLat, post.currentLng]} zoom={11} style={{ height: '100%', width: '100%' }}>
@@ -629,7 +630,6 @@ const button3DStyle: React.CSSProperties = {
   padding: '14px',
   borderRadius: '12px',
   border: 'none',
-  background: 'linear-[#0284c7]',
   backgroundColor: '#0284c7',
   color: '#fff',
   fontWeight: 'bold',
