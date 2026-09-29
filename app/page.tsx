@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 
 const DynamicMapContainer = dynamic(
@@ -22,9 +22,9 @@ const DynamicPopup = dynamic(
 
 import 'leaflet/dist/leaflet.css';
 
-// Calculate distance in KM using Haversine Formula
+// Haversine Distance Calculation (KM)
 function calculateDistanceKM(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // Earth radius in km
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -42,7 +42,9 @@ interface DriverPost {
   driverName: string;
   driverPhone: string;
   vehicleType: string;
+  vehicleCategory: 'CAR' | 'BUS' | 'LORRY' | 'BIKE' | 'CLASSIC';
   price: string;
+  availableSeats: string;
   startLocationName: string;
   endLocationName: string;
   startLat: number;
@@ -56,9 +58,10 @@ interface DriverPost {
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
+  const [authMode, setAuthMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
   const [role, setRole] = useState<'PASSENGER' | 'DRIVER'>('PASSENGER');
-  
-  // Auth Form
+
+  // Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -66,24 +69,25 @@ export default function App() {
 
   // Driver Creation State
   const [startLoc, setStartLoc] = useState('Colombo');
-  const [destQuery, setDestQuery] = useState('');
-  const [vehicle, setVehicle] = useState('Car / Sedan');
+  const [destQuery, setDestQuery] = useState('Kandy');
+  const [vehicle, setVehicle] = useState('Toyota Axio VIP');
+  const [vehicleCat, setVehicleCat] = useState<'CAR' | 'BUS' | 'LORRY' | 'BIKE' | 'CLASSIC'>('CAR');
   const [price, setPrice] = useState('3500');
+  const [seats, setSeats] = useState('3');
   const [postLat, setPostLat] = useState<number>(7.2906); // Default Kandy
   const [postLng, setPostLng] = useState<number>(80.6337);
-  const [driverCurrentLat, setDriverCurrentLat] = useState<number>(6.9271); // Default Colombo
 
-  // All Driver Posts
+  // Driver & Passenger Posts Storage
   const [driverPosts, setDriverPosts] = useState<DriverPost[]>([]);
 
-  // Passenger Matching State
+  // Passenger Match State
   const [passengerDestQuery, setPassengerDestQuery] = useState('');
   const [passengerDestLat, setPassengerDestLat] = useState<number | null>(null);
   const [passengerDestLng, setPassengerDestLng] = useState<number | null>(null);
   const [passengerLiveGPS, setPassengerLiveGPS] = useState<{ lat: number; lng: number } | null>(null);
   const [activeBookedRide, setActiveBookedRide] = useState<DriverPost | null>(null);
 
-  // Load Saved Storage
+  // Initialize Data
   useEffect(() => {
     const savedUser = localStorage.getItem('galaxy_user');
     if (savedUser) setUser(JSON.parse(savedUser));
@@ -97,173 +101,187 @@ export default function App() {
           id: 'POST-101',
           driverName: 'Kasun Fernando',
           driverPhone: '0778899000',
-          vehicleType: 'Toyota Axio VIP',
-          price: '4000',
+          vehicleType: 'Toyota Axio (Sedan)',
+          vehicleCategory: 'CAR',
+          price: '3800',
+          availableSeats: '3 Seats',
           startLocationName: 'Colombo Fort',
-          endLocationName: 'Kandy City Center',
+          endLocationName: 'Kandy',
           startLat: 6.9344,
           startLng: 79.8428,
           endLat: 7.2906,
           endLng: 80.6337,
-          currentLat: 6.9271, // Colombo
+          currentLat: 6.9271,
           currentLng: 79.8612,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         },
         {
           id: 'POST-102',
-          driverName: 'Nimal Siripala',
-          driverPhone: '0712233445',
-          vehicleType: 'Isuzu Elf Lorry (Cargo)',
-          price: '8500',
+          driverName: 'Sarath Perera',
+          driverPhone: '0714455667',
+          vehicleType: 'Isuzu Elf Lorry (Return Load)',
+          vehicleCategory: 'LORRY',
+          price: '8000',
+          availableSeats: 'Full Cargo Space',
           startLocationName: 'Kurunegala',
-          endLocationName: 'Peradeniya Kandy',
+          endLocationName: 'Galle',
           startLat: 7.4863,
           startLng: 80.3623,
-          endLat: 7.2596,
-          endLng: 80.5974,
+          endLat: 6.0535,
+          endLng: 80.221,
           currentLat: 7.4863,
           currentLng: 80.3623,
-          createdAt: new Date().toISOString()
-        }
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'POST-103',
+          driverName: 'Saman Kumara',
+          driverPhone: '0751122334',
+          vehicleType: 'Datsun B211 (Classic Budget)',
+          vehicleCategory: 'CLASSIC',
+          price: '2000',
+          availableSeats: '2 Seats',
+          startLocationName: 'Gampaha',
+          endLocationName: 'Colombo',
+          startLat: 7.0873,
+          startLng: 79.998,
+          endLat: 6.9271,
+          endLng: 79.8612,
+          currentLat: 7.0873,
+          currentLng: 79.998,
+          createdAt: new Date().toISOString(),
+        },
       ];
       setDriverPosts(initialPosts);
       localStorage.setItem('galaxy_driver_posts', JSON.stringify(initialPosts));
     }
   }, []);
 
-  // Real-time Passenger GPS Tracking
+  // Live GPS Watch
   useEffect(() => {
     if (typeof window !== 'undefined' && navigator.geolocation) {
       const watchId = navigator.geolocation.watchPosition(
         (pos) => {
           setPassengerLiveGPS({
             lat: pos.coords.latitude,
-            lng: pos.coords.longitude
+            lng: pos.coords.longitude,
           });
         },
-        (err) => console.log('Location access pending'),
+        () => console.log('Location access waiting...'),
         { enableHighAccuracy: true }
       );
       return () => navigator.geolocation.clearWatch(watchId);
     }
   }, []);
 
-  // Driver Search Location Debounce Auto-Map Jump
-  useEffect(() => {
-    if (!destQuery || destQuery.length < 3) return;
-
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destQuery)}`);
-        const data = await res.json();
-        if (data && data.length > 0) {
-          setPostLat(parseFloat(data[0].lat));
-          setPostLng(parseFloat(data[0].lon));
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [destQuery]);
-
-  // Passenger Location Lookup
-  const handlePassengerSearchLocation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!passengerDestQuery) return alert('කරුණාකර ගමනාන්තයක් ඇතුළත් කරන්න.');
-
+  // Google Maps Style Fly-To Location Lookup
+  const searchLocationAndFly = async (queryName: string, isDriver: boolean) => {
+    if (!queryName || queryName.length < 2) return;
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(passengerDestQuery)}`);
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryName)}`
+      );
       const data = await res.json();
       if (data && data.length > 0) {
-        setPassengerDestLat(parseFloat(data[0].lat));
-        setPassengerDestLng(parseFloat(data[0].lon));
-      } else {
-        alert('එම ස්ථානය සොයාගැනීමට නොහැකි විය.');
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        if (isDriver) {
+          setPostLat(lat);
+          setPostLng(lng);
+        } else {
+          setPassengerDestLat(lat);
+          setPassengerDestLng(lng);
+        }
       }
     } catch (e) {
-      alert('Search Error');
+      console.error(e);
     }
   };
 
-  // Draggable Marker Event Handler for Driver
-  const eventHandlers = useMemo(
-    () => ({
-      dragend(e: any) {
-        const marker = e.target;
-        if (marker != null) {
-          const latLng = marker.getLatLng();
-          setPostLat(latLng.lat);
-          setPostLng(latLng.lng);
-        }
-      },
-    }),
-    [],
-  );
-
-  // Authenticate
-  const handleAuth = (e: React.FormEvent) => {
+  // Auth Handler
+  const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const userData = { id: 'USR-' + Date.now(), firstName: firstName || 'User', email, role, phone: phone || '0771234567' };
+    const userData = {
+      id: 'USR-' + Date.now(),
+      firstName: firstName || (email ? email.split('@')[0] : 'User'),
+      email,
+      role,
+      phone: phone || '0770001122',
+      isVerified: true,
+    };
     localStorage.setItem('galaxy_user', JSON.stringify(userData));
     setUser(userData);
   };
 
-  // Driver Post Submission
+  // Driver Post Publisher
   const handlePublishPost = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!destQuery) return alert('ගමනාන්තය ඇතුළත් කරන්න!');
+    if (!destQuery) return alert('කරුණාකර ගමනාන්තයක් ඇතුළත් කරන්න!');
 
     const newPost: DriverPost = {
       id: 'POST-' + Date.now(),
-      driverName: `${user.firstName}`,
+      driverName: user.firstName,
       driverPhone: user.phone,
       vehicleType: vehicle,
+      vehicleCategory: vehicleCat,
       price: price,
+      availableSeats: seats,
       startLocationName: startLoc,
       endLocationName: destQuery,
-      startLat: driverCurrentLat,
+      startLat: 6.9271,
       startLng: 79.8612,
       endLat: postLat,
       endLng: postLng,
-      currentLat: driverCurrentLat,
+      currentLat: 6.9271,
       currentLng: 79.8612,
-      createdAt: new Date().toLocaleString()
+      createdAt: new Date().toLocaleString(),
     };
 
     const updated = [newPost, ...driverPosts];
     setDriverPosts(updated);
     localStorage.setItem('galaxy_driver_posts', JSON.stringify(updated));
-    alert('🚀 Driver Trip Post එක සාර්ථකව පලකරන ලදී!');
-    setDestQuery('');
+    alert('🚀 Driver Route Post එක සාර්ථකව පලකරන ලදී!');
   };
 
-  // Filter Matching Drivers for Passenger
+  // Passenger Dynamic Smart Filter
   const matchedDriverPosts = useMemo(() => {
     if (!passengerDestQuery) return driverPosts;
 
     const query = passengerDestQuery.toLowerCase().trim();
 
     return driverPosts.filter((post) => {
-      // 1. Text Based Exact / Partial City Match
-      const nameMatch = post.endLocationName.toLowerCase().includes(query) || query.includes(post.endLocationName.toLowerCase());
+      const nameMatch =
+        post.endLocationName.toLowerCase().includes(query) ||
+        query.includes(post.endLocationName.toLowerCase());
 
-      // 2. Spatial Distance Match (Within 15 KM Radius)
       let radiusMatch = false;
       if (passengerDestLat && passengerDestLng) {
-        const dist = calculateDistanceKM(passengerDestLat, passengerDestLng, post.endLat, post.endLng);
-        if (dist <= 15) radiusMatch = true; // 15KM Nearby City Match
+        const dist = calculateDistanceKM(
+          passengerDestLat,
+          passengerDestLng,
+          post.endLat,
+          post.endLng
+        );
+        if (dist <= 15) radiusMatch = true; // 15KM Nearby Radius Match
       }
 
-      // 3. Expire Rule: If Driver Passed Passenger Location by > 2KM
+      // Hide expired driver posts (if driver passed passenger by > 2km)
       let isExpired = false;
       if (passengerLiveGPS) {
-        const distFromDriverToPassenger = calculateDistanceKM(post.currentLat, post.currentLng, passengerLiveGPS.lat, passengerLiveGPS.lng);
-        const distFromStartToPassenger = calculateDistanceKM(post.startLat, post.startLng, passengerLiveGPS.lat, passengerLiveGPS.lng);
-        
-        // If driver is further along the route past passenger by 2km
-        if (distFromDriverToPassenger > distFromStartToPassenger && distFromDriverToPassenger > 2) {
+        const distFromDriver = calculateDistanceKM(
+          post.currentLat,
+          post.currentLng,
+          passengerLiveGPS.lat,
+          passengerLiveGPS.lng
+        );
+        const distFromStart = calculateDistanceKM(
+          post.startLat,
+          post.startLng,
+          passengerLiveGPS.lat,
+          passengerLiveGPS.lng
+        );
+
+        if (distFromDriver > distFromStart && distFromDriver > 2) {
           isExpired = true;
         }
       }
@@ -278,25 +296,99 @@ export default function App() {
     setUser(null);
   };
 
+  // LOGIN / SIGNUP UI
   if (!user) {
     return (
-      <div style={{ minHeight: '100vh', background: 'radial-gradient(circle, #0f172a, #020617)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-        <div style={{ width: '100%', maxWidth: '400px', background: 'rgba(30, 41, 59, 0.85)', backdropFilter: 'blur(16px)', borderRadius: '20px', padding: '28px', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <h2 style={{ textAlign: 'center', color: '#38bdf8', margin: '0 0 10px 0' }}>🚀 Galaxy Rides 3D</h2>
-          <p style={{ textTransform: 'uppercase', textAlign: 'center', fontSize: '11px', color: '#94a3b8', letterSpacing: '1px' }}>AI-Powered Smart Ride & Cargo Matching</p>
-
-          <div style={{ display: 'flex', gap: '8px', margin: '20px 0' }}>
-            <button type="button" onClick={() => setRole('PASSENGER')} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: role === 'PASSENGER' ? '#0284c7' : '#1e293b', color: '#fff', fontWeight: 'bold' }}>🧍 Passenger</button>
-            <button type="button" onClick={() => setRole('DRIVER')} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: role === 'DRIVER' ? '#0284c7' : '#1e293b', color: '#fff', fontWeight: 'bold' }}>🚗 Driver</button>
+      <div style={container3DStyle}>
+        <div style={glassCardStyle}>
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <h1 style={{ color: '#38bdf8', margin: '0 0 6px 0', fontSize: '28px', fontWeight: '800', letterSpacing: '-0.5px' }}>
+              🌌 Galaxy Rides 3D
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              AI-Driven Multi-Modal Ride & Logistics Platform
+            </p>
           </div>
 
-          <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <input type="text" placeholder="Name" required value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inputStyle} />
-            <input type="text" placeholder="Phone Number" required value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
-            <input type="email" placeholder="Email" required value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
-            <input type="password" placeholder="Password" required value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
-            <button type="submit" style={{ padding: '14px', borderRadius: '10px', border: 'none', background: '#0284c7', color: '#fff', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
-              Continue as {role}
+          {/* LOGIN / SIGNUP TAB SWITCHER */}
+          <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.8)', padding: '4px', borderRadius: '12px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <button
+              type="button"
+              onClick={() => setAuthMode('LOGIN')}
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: authMode === 'LOGIN' ? '#0284c7' : 'transparent', color: '#fff', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' }}
+            >
+              🔑 Login
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode('SIGNUP')}
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: authMode === 'SIGNUP' ? '#0284c7' : 'transparent', color: '#fff', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' }}
+            >
+              📝 Sign Up
+            </button>
+          </div>
+
+          {/* ROLE SELECTOR */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+            <button
+              type="button"
+              onClick={() => setRole('PASSENGER')}
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: role === 'PASSENGER' ? '1px solid #38bdf8' : '1px solid transparent', background: role === 'PASSENGER' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(30, 41, 59, 0.5)', color: '#fff', fontWeight: '600', cursor: 'pointer' }}
+            >
+              🧍 Passenger
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('DRIVER')}
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: role === 'DRIVER' ? '1px solid #38bdf8' : '1px solid transparent', background: role === 'DRIVER' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(30, 41, 59, 0.5)', color: '#fff', fontWeight: '600', cursor: 'pointer' }}
+            >
+              🚗 Driver
+            </button>
+          </div>
+
+          {/* AUTH FORM */}
+          <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {authMode === 'SIGNUP' && (
+              <>
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  style={input3DStyle}
+                />
+                <input
+                  type="text"
+                  placeholder="Phone Number (WhatsApp)"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  style={input3DStyle}
+                />
+              </>
+            )}
+
+            <input
+              type="email"
+              placeholder="Email Address"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={input3DStyle}
+            />
+
+            <input
+              type="password"
+              placeholder="Password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={input3DStyle}
+            />
+
+            <button type="submit" style={button3DStyle}>
+              {authMode === 'LOGIN' ? `Login as ${role}` : `Create ${role} Account`}
             </button>
           </form>
         </div>
@@ -304,138 +396,171 @@ export default function App() {
     );
   }
 
+  // MAIN PLATFORM INTERFACE
   return (
-    <div style={{ minHeight: '100vh', background: '#020617', color: '#fff', fontFamily: 'system-ui, sans-serif' }}>
-      {/* Navbar */}
-      <nav style={{ padding: '14px 20px', background: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#38bdf8' }}>🚀 Galaxy Rides</span>
-        <div>
-          <span style={{ fontSize: '13px', marginRight: '10px' }}>👤 {user.firstName} ({user.role})</span>
-          <button onClick={logout} style={{ padding: '5px 10px', background: '#ef4444', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer' }}>Logout</button>
+    <div style={{ minHeight: '100vh', background: '#020617', color: '#e2e8f0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {/* NAVBAR */}
+      <nav style={{ padding: '16px 24px', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', stickyTop: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#38bdf8' }}>🌌 Galaxy Rides 3D</span>
+          <span style={{ fontSize: '10px', background: '#0284c7', color: '#fff', padding: '2px 8px', borderRadius: '20px', fontWeight: 'bold' }}>LIVE</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '13px', color: '#94a3b8' }}>👤 {user.firstName} ({user.role})</span>
+          <button onClick={logout} style={{ padding: '6px 12px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', borderRadius: '8px', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>Logout</button>
         </div>
       </nav>
 
-      <div style={{ maxWidth: '800px', margin: '20px auto', padding: '0 16px' }}>
+      <div style={{ maxWidth: '900px', margin: '24px auto', padding: '0 16px' }}>
 
-        {/* DRIVER PANEL */}
+        {/* DRIVER TRIP CREATOR PANEL */}
         {user.role === 'DRIVER' && (
-          <div style={{ background: 'rgba(30, 41, 59, 0.7)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '24px' }}>
-            <h3 style={{ color: '#38bdf8', marginTop: 0 }}>📢 Driver: Create Route Post</h3>
-            
-            <form onSubmit={handlePublishPost} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <input type="text" placeholder="Start City (e.g. Colombo)" value={startLoc} onChange={(e) => setStartLoc(e.target.value)} style={inputStyle} />
-              <input type="text" placeholder="Destination City (Type to Auto-Locate on Map)" value={destQuery} onChange={(e) => setDestQuery(e.target.value)} style={inputStyle} />
+          <div style={glassPanelStyle}>
+            <h3 style={{ color: '#38bdf8', margin: '0 0 16px 0', fontSize: '18px' }}>📢 Post Your Route & Destination</h3>
 
+            <form onSubmit={handlePublishPost} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <input type="text" placeholder="Vehicle Model" value={vehicle} onChange={(e) => setVehicle(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                <input type="text" placeholder="Price (LKR)" value={price} onChange={(e) => setPrice(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                <input type="text" placeholder="Start City (e.g. Colombo)" value={startLoc} onChange={(e) => setStartLoc(e.target.value)} style={input3DStyle} />
+                <div style={{ display: 'flex', flex: 1, gap: '6px' }}>
+                  <input type="text" placeholder="Destination City (e.g. Kandy)" value={destQuery} onChange={(e) => setDestQuery(e.target.value)} style={input3DStyle} />
+                  <button type="button" onClick={() => searchLocationAndFly(destQuery, true)} style={{ padding: '0 14px', background: '#0284c7', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>Fly Map</button>
+                </div>
               </div>
 
-              <p style={{ fontSize: '12px', color: '#94a3b8', margin: '4px 0' }}>📍 **Tip:** Map Marker එක drag කර ඔබට අවශ්‍ය නිවැරදි ස්ථානය මත තබන්න.</p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <select value={vehicleCat} onChange={(e: any) => setVehicleCat(e.target.value)} style={input3DStyle}>
+                  <option value="CAR">🚗 Passenger Car / SUV</option>
+                  <option value="BUS">🚌 Bus / Mini Coach</option>
+                  <option value="LORRY">🚚 Lorry / Cargo Truck</option>
+                  <option value="BIKE">📦 Bike / Express Courier</option>
+                  <option value="CLASSIC">🚙 Classic / Budget Ride</option>
+                </select>
 
-              {/* Dynamic Interactive Map with Draggable Marker */}
-              <div style={{ height: '250px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #38bdf8' }}>
+                <input type="text" placeholder="Vehicle Name" value={vehicle} onChange={(e) => setVehicle(e.target.value)} style={input3DStyle} />
+                <input type="text" placeholder="Price (LKR)" value={price} onChange={(e) => setPrice(e.target.value)} style={input3DStyle} />
+              </div>
+
+              {/* DYNAMIC MAP VIEW */}
+              <div style={{ height: '260px', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(56, 189, 248, 0.3)', marginTop: '6px' }}>
                 {/* @ts-ignore */}
-                <DynamicMapContainer center={[postLat, postLng]} zoom={13} style={{ height: '100%', width: '100%' }}>
+                <DynamicMapContainer center={[postLat, postLng]} zoom={12} style={{ height: '100%', width: '100%' }}>
                   {/* @ts-ignore */}
                   <DynamicTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   {/* @ts-ignore */}
-                  <DynamicMarker position={[postLat, postLng]} draggable={true} eventHandlers={eventHandlers}>
+                  <DynamicMarker position={[postLat, postLng]} draggable={true}>
                     {/* @ts-ignore */}
-                    <DynamicPopup>📍 Target Destination Location</DynamicPopup>
+                    <DynamicPopup>📍 Destination Target Location</DynamicPopup>
                   </DynamicMarker>
                 </DynamicMapContainer>
               </div>
 
-              <button type="submit" style={{ padding: '12px', background: '#10b981', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 'bold', cursor: 'pointer', marginTop: '6px' }}>
-                Publish Trip Post
-              </button>
+              <button type="submit" style={button3DStyle}>🚀 Publish Route Post</button>
             </form>
           </div>
         )}
 
-        {/* PASSENGER PANEL */}
+        {/* PASSENGER SEARCH PANEL */}
         {user.role === 'PASSENGER' && (
-          <div style={{ background: 'rgba(30, 41, 59, 0.7)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '24px' }}>
-            <h3 style={{ color: '#38bdf8', marginTop: 0 }}>🔍 Passenger: Find Destination Driver</h3>
+          <div style={glassPanelStyle}>
+            <h3 style={{ color: '#38bdf8', margin: '0 0 16px 0', fontSize: '18px' }}>🔍 Search Destination Route</h3>
             
-            <form onSubmit={handlePassengerSearchLocation} style={{ display: 'flex', gap: '8px' }}>
-              <input 
-                type="text" 
-                placeholder="Where do you want to go? (e.g. Kandy / Galle)" 
-                value={passengerDestQuery} 
-                onChange={(e) => setPassengerDestQuery(e.target.value)} 
-                style={{ ...inputStyle, flex: 1 }} 
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input
+                type="text"
+                placeholder="Where do you want to go? (e.g. Kandy / Galle)"
+                value={passengerDestQuery}
+                onChange={(e) => {
+                  setPassengerDestQuery(e.target.value);
+                  searchLocationAndFly(e.target.value, false);
+                }}
+                style={{ ...input3DStyle, flex: 1 }}
               />
-              <button type="submit" style={{ padding: '0 20px', background: '#0284c7', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>
+              <button
+                type="button"
+                onClick={() => searchLocationAndFly(passengerDestQuery, false)}
+                style={{ padding: '0 24px', background: '#0284c7', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+              >
                 Search
               </button>
-            </form>
+            </div>
           </div>
         )}
 
-        {/* MATCHED DRIVER LISTING */}
-        <h3>Available Matches ({matchedDriverPosts.length})</h3>
+        {/* MATCHED LISTINGS */}
+        <h3 style={{ margin: '20px 0 12px 0', fontSize: '18px', color: '#94a3b8' }}>
+          Available Route Drivers ({matchedDriverPosts.length})
+        </h3>
 
         {matchedDriverPosts.length === 0 ? (
-          <div style={{ padding: '20px', background: 'rgba(30, 41, 59, 0.3)', borderRadius: '12px', textAlign: 'center', color: '#64748b' }}>
+          <div style={{ padding: '30px', background: 'rgba(30, 41, 59, 0.4)', borderRadius: '16px', textAlign: 'center', color: '#64748b' }}>
             ඔබ සොයන ගමනාන්තයට හෝ ආසන්නයට යන Drivers ලා දැනට නොමැත.
           </div>
         ) : (
           matchedDriverPosts.map((post) => (
-            <div key={post.id} style={{ background: 'rgba(15, 23, 42, 0.9)', padding: '18px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.1)', marginBottom: '14px' }}>
+            <div key={post.id} style={card3DStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <h4 style={{ margin: '0 0 6px 0', color: '#38bdf8', fontSize: '17px' }}>🚘 {post.vehicleType} - {post.driverName}</h4>
-                  <p style={{ margin: '2px 0', fontSize: '14px', color: '#cbd5e1' }}>🚩 Start: <strong>{post.startLocationName}</strong> ➔ 🏁 Destination: <strong>{post.endLocationName}</strong></p>
-                  <p style={{ margin: '2px 0', fontSize: '13px', color: '#94a3b8' }}>📞 Contact: {post.driverPhone}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '18px' }}>
+                      {post.vehicleCategory === 'CAR' && '🚗'}
+                      {post.vehicleCategory === 'BUS' && '🚌'}
+                      {post.vehicleCategory === 'LORRY' && '🚚'}
+                      {post.vehicleCategory === 'BIKE' && '📦'}
+                      {post.vehicleCategory === 'CLASSIC' && '🚙'}
+                    </span>
+                    <h4 style={{ margin: 0, color: '#38bdf8', fontSize: '18px' }}>{post.vehicleType}</h4>
+                    <span style={{ fontSize: '11px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '12px' }}>
+                      {post.driverName}
+                    </span>
+                  </div>
+
+                  <p style={{ margin: '4px 0', fontSize: '14px', color: '#cbd5e1' }}>
+                    🚩 Start: <strong>{post.startLocationName}</strong> ➔ 🏁 Target: <strong>{post.endLocationName}</strong>
+                  </p>
+                  <p style={{ margin: '4px 0', fontSize: '13px', color: '#94a3b8' }}>
+                    📞 Contact: <strong>{post.driverPhone}</strong>
+                  </p>
                 </div>
+
                 <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#34d399' }}>LKR {post.price}</span>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#34d399' }}>LKR {post.price}</div>
                   {user.role === 'PASSENGER' && (
-                    <button 
-                      onClick={() => setActiveBookedRide(post)} 
-                      style={{ display: 'block', marginTop: '8px', padding: '8px 14px', background: '#10b981', border: 'none', borderRadius: '6px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+                    <button
+                      onClick={() => setActiveBookedRide(post)}
+                      style={{ marginTop: '10px', padding: '8px 16px', background: '#10b981', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
                     >
-                      Apply & Track Live Map
+                      Track Live Map
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* REAL-TIME TWO-WAY GPS MAP VIEW */}
+              {/* MUTUAL LIVE GPS TRACKING MAP */}
               {activeBookedRide?.id === post.id && (
-                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px', border: '1px solid #10b981' }}>
-                  <p style={{ color: '#34d399', fontSize: '13px', fontWeight: 'bold', margin: '0 0 8px 0' }}>📍 Active Live GPS Map Tracking Enabled</p>
-                  
-                  <div style={{ height: '220px', borderRadius: '8px', overflow: 'hidden' }}>
+                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '12px', border: '1px solid #10b981' }}>
+                  <p style={{ color: '#34d399', fontSize: '13px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
+                    📍 Real-Time Mutual Live GPS Tracking Enabled
+                  </p>
+                  <div style={{ height: '240px', borderRadius: '10px', overflow: 'hidden' }}>
                     {/* @ts-ignore */}
                     <DynamicMapContainer center={[post.currentLat, post.currentLng]} zoom={11} style={{ height: '100%', width: '100%' }}>
                       {/* @ts-ignore */}
                       <DynamicTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      
-                      {/* Driver Marker */}
+                      {/* Driver Position */}
                       {/* @ts-ignore */}
                       <DynamicMarker position={[post.currentLat, post.currentLng]}>
                         {/* @ts-ignore */}
-                        <DynamicPopup>🚗 Driver Live Location ({post.driverName})</DynamicPopup>
+                        <DynamicPopup>🚗 Driver Live GPS ({post.driverName})</DynamicPopup>
                       </DynamicMarker>
 
-                      {/* Passenger Marker */}
+                      {/* Passenger Position */}
                       {passengerLiveGPS && (
                         /* @ts-ignore */
                         <DynamicMarker position={[passengerLiveGPS.lat, passengerLiveGPS.lng]}>
                           {/* @ts-ignore */}
-                          <DynamicPopup>🧍 Your Live GPS Location</DynamicPopup>
+                          <DynamicPopup>🧍 Your Live Location</DynamicPopup>
                         </DynamicMarker>
                       )}
-
-                      {/* Target Destination Marker */}
-                      {/* @ts-ignore */}
-                      <DynamicMarker position={[post.endLat, post.endLng]}>
-                        {/* @ts-ignore */}
-                        <DynamicPopup>🏁 Target Destination ({post.endLocationName})</DynamicPopup>
-                      </DynamicMarker>
                     </DynamicMapContainer>
                   </div>
                 </div>
@@ -448,13 +573,67 @@ export default function App() {
   );
 }
 
-const inputStyle = {
+// 3D STYLES & GLASSMORPHISM
+const container3DStyle: React.CSSProperties = {
+  minHeight: '100vh',
+  background: 'radial-gradient(circle at center, #0f172a 0%, #020617 100%)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '20px',
+};
+
+const glassCardStyle: React.CSSProperties = {
   width: '100%',
-  padding: '10px 14px',
-  borderRadius: '8px',
+  maxWidth: '420px',
+  background: 'rgba(30, 41, 59, 0.75)',
+  backdropFilter: 'blur(20px)',
+  borderRadius: '24px',
+  padding: '32px',
+  border: '1px solid rgba(255,255,255,0.12)',
+  boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+};
+
+const glassPanelStyle: React.CSSProperties = {
+  background: 'rgba(30, 41, 59, 0.6)',
+  backdropFilter: 'blur(16px)',
+  padding: '24px',
+  borderRadius: '20px',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  marginBottom: '24px',
+};
+
+const card3DStyle: React.CSSProperties = {
+  background: 'rgba(15, 23, 42, 0.85)',
+  backdropFilter: 'blur(12px)',
+  padding: '20px',
+  borderRadius: '16px',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
+  marginBottom: '16px',
+  boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+};
+
+const input3DStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '12px 16px',
+  borderRadius: '10px',
   border: '1px solid rgba(255, 255, 255, 0.15)',
-  background: 'rgba(15, 23, 42, 0.6)',
+  background: 'rgba(15, 23, 42, 0.8)',
   color: '#fff',
   outline: 'none',
-  fontSize: '14px'
+  fontSize: '14px',
+};
+
+const button3DStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '14px',
+  borderRadius: '12px',
+  border: 'none',
+  background: 'linear-[#0284c7]',
+  backgroundColor: '#0284c7',
+  color: '#fff',
+  fontWeight: 'bold',
+  fontSize: '15px',
+  cursor: 'pointer',
+  boxShadow: '0 4px 15px rgba(2, 132, 199, 0.4)',
 };
