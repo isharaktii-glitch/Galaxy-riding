@@ -24,7 +24,7 @@ const Polyline = dynamic(
   { ssr: false }
 );
 
-// Map Dynamic Controller Component using leaflet instance directly
+// Map FlyTo Controller Component
 const MapFlyTo = dynamic(
   () =>
     import("react-leaflet").then((mod) => {
@@ -107,7 +107,7 @@ export default function GalaxyRides3D() {
   const [endSuggestions, setEndSuggestions] = useState<Suggestion[]>([]);
 
   const [mapCenter, setMapCenter] = useState<[number, number]>([6.9344, 79.8428]);
-  const [mapZoom, setMapZoom] = useState<number>(10);
+  const [mapZoom, setMapZoom] = useState<number>(12);
 
   const [roadRoute, setRoadRoute] = useState<[number, number][]>([]);
   const [routeDistance, setRouteDistance] = useState<string>("");
@@ -116,9 +116,9 @@ export default function GalaxyRides3D() {
   const [searchDestination, setSearchDestination] = useState("");
 
   // Passenger Live Pickup Location
-  const [passengerCoords] = useState<[number, number]>([6.9271, 79.8612]);
+  const [passengerCoords, setPassengerCoords] = useState<[number, number]>([6.9271, 79.8612]);
 
-  // Fetch Live Suggestions
+  // Fetch Live Suggestions for Autocomplete
   const fetchSuggestions = async (
     query: string,
     setFn: (suggestions: Suggestion[]) => void
@@ -158,7 +158,7 @@ export default function GalaxyRides3D() {
     setStartCoords(coords);
     setStartSuggestions([]);
     setMapCenter(coords);
-    setMapZoom(16);
+    setMapZoom(15);
   };
 
   const selectEndSuggestion = (s: Suggestion) => {
@@ -167,9 +167,39 @@ export default function GalaxyRides3D() {
     setEndCoords(coords);
     setEndSuggestions([]);
     setMapCenter(coords);
-    setMapZoom(16);
+    setMapZoom(15);
   };
 
+  // Get Current GPS Location
+  const handleFindMyLocation = (isPassengerMode = false) => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const coords: [number, number] = [lat, lng];
+
+          if (isPassengerMode) {
+            setPassengerCoords(coords);
+            alert("📍 Your current GPS location detected!");
+          } else {
+            setStartCoords(coords);
+            setStartQuery("My Current GPS Location");
+            setMapCenter(coords);
+            setMapZoom(16);
+          }
+        },
+        (error) => {
+          alert("Unable to fetch location. Please allow browser location access.");
+          console.error(error);
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by your browser.");
+    }
+  };
+
+  // Fetch OSRM Real Road Route
   const fetchRealRoadRoute = async (start: [number, number], end: [number, number]) => {
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
@@ -185,6 +215,8 @@ export default function GalaxyRides3D() {
 
         const distInKm = (data.routes[0].distance / 1000).toFixed(1);
         setRouteDistance(`${distInKm} km`);
+      } else {
+        setRoadRoute([start, end]);
       }
     } catch (err) {
       console.error("OSRM Route Fetch Error:", err);
@@ -223,8 +255,8 @@ export default function GalaxyRides3D() {
       startCoords,
       endName: endQuery,
       endCoords,
-      routePolyline: roadRoute,
-      distanceKm: routeDistance,
+      routePolyline: roadRoute.length > 0 ? roadRoute : [startCoords, endCoords],
+      distanceKm: routeDistance || "N/A",
       isLadiesOnly,
     };
 
@@ -250,7 +282,7 @@ export default function GalaxyRides3D() {
         return ride;
       })
     );
-    alert("🎉 Ride Booked! Driver and Passenger locations are now shared live.");
+    alert("🎉 Ride Booked! Live driver & passenger location shared.");
   };
 
   if (!currentUser) {
@@ -361,7 +393,15 @@ export default function GalaxyRides3D() {
       {currentUser.role === "driver" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", maxWidth: "1200px", margin: "0 auto" }}>
           <div style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
-            <h3 style={{ color: "#38bdf8", marginTop: "0" }}>🚗 Driver Panel & Route Setup</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <h3 style={{ color: "#38bdf8", margin: 0 }}>🚗 Driver Panel & Route Setup</h3>
+              <button
+                onClick={() => handleFindMyLocation(false)}
+                style={{ padding: "6px 12px", background: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem", fontWeight: "bold" }}
+              >
+                🎯 Find My Location
+              </button>
+            </div>
 
             {/* Start Location Input */}
             <div style={{ marginBottom: "16px", position: "relative" }}>
@@ -466,8 +506,9 @@ export default function GalaxyRides3D() {
                 <Popup>🔴 Destination: {endQuery}</Popup>
               </Marker>
 
+              {/* Road Path Highlight Line */}
               {roadRoute.length > 0 && (
-                <Polyline positions={roadRoute} color="#0284c7" weight={5} />
+                <Polyline positions={roadRoute} pathOptions={{ color: "#0284c7", weight: 6, opacity: 0.8 }} />
               )}
 
               {/* Display Booked Passenger Live Pickup Location */}
@@ -491,7 +532,15 @@ export default function GalaxyRides3D() {
       {currentUser.role === "passenger" && (
         <div style={{ maxWidth: "950px", margin: "0 auto" }}>
           <div style={{ background: "#1e293b", padding: "16px", borderRadius: "12px", marginBottom: "20px" }}>
-            <h3 style={{ color: "#38bdf8", marginTop: "0" }}>🔍 Find & Track Your Ride</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+              <h3 style={{ color: "#38bdf8", margin: 0 }}>🔍 Find & Track Your Ride</h3>
+              <button
+                onClick={() => handleFindMyLocation(true)}
+                style={{ padding: "6px 12px", background: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem", fontWeight: "bold" }}
+              >
+                🎯 Set My Live GPS Location
+              </button>
+            </div>
             <input
               type="text"
               placeholder="Search destination (e.g. Kandy, Dalada Maligawa)"
@@ -535,10 +584,10 @@ export default function GalaxyRides3D() {
                       <b>Route:</b> {ride.startName} ➔ {ride.endName} ({ride.distanceKm})
                     </p>
 
-                    {/* PickMe Dynamic Live Tracking Map */}
+                    {/* Live Road Route Map */}
                     <div style={{ height: "300px", borderRadius: "8px", overflow: "hidden", marginTop: "14px" }}>
                       <MapContainer
-                        center={ride.bookedBy ? ride.startCoords : ride.startCoords}
+                        center={ride.startCoords}
                         zoom={ride.bookedBy ? 14 : 10}
                         style={{ height: "100%", width: "100%" }}
                       >
@@ -559,7 +608,7 @@ export default function GalaxyRides3D() {
                           </Marker>
                         )}
 
-                        <Polyline positions={ride.routePolyline} color="#0284c7" weight={4} />
+                        <Polyline positions={ride.routePolyline} pathOptions={{ color: "#0284c7", weight: 5, opacity: 0.8 }} />
                       </MapContainer>
                     </div>
                   </div>
