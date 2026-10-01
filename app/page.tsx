@@ -1,587 +1,420 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import dynamic from 'next/dynamic';
+import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 
-const DynamicMapContainer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.MapContainer),
+// Dynamically import Leaflet components (SSR bypass for Next.js)
+const MapContainer = dynamic(
+  () => import("react-leaflet").then((mod) => mod.MapContainer),
   { ssr: false }
 );
-const DynamicTileLayer = dynamic(
-  () => import('react-leaflet').then((mod) => mod.TileLayer),
+const TileLayer = dynamic(
+  () => import("react-leaflet").then((mod) => mod.TileLayer),
   { ssr: false }
 );
-const DynamicMarker = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Marker),
+const Marker = dynamic(
+  () => import("react-leaflet").then((mod) => mod.Marker),
   { ssr: false }
 );
-const DynamicPopup = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Popup),
+const Popup = dynamic(
+  () => import("react-leaflet").then((mod) => mod.Popup),
   { ssr: false }
 );
-const MapFlyToController = dynamic(
-  () =>
-    import('react-leaflet').then((mod) => {
-      const { useMap } = mod;
-      return function MapFlyTo({ center }: { center: [number, number] }) {
-        const map = useMap();
-        useEffect(() => {
-          if (center) {
-            map.flyTo(center, 15, { duration: 1.5 });
-          }
-        }, [center, map]);
-        return null;
-      };
-    }),
+const Polyline = dynamic(
+  () => import("react-leaflet").then((mod) => mod.Polyline),
+  { ssr: false }
+);
+const useMap = dynamic(
+  () => import("react-leaflet").then((mod) => mod.useMap),
   { ssr: false }
 );
 
-import 'leaflet/dist/leaflet.css';
+import "leaflet/dist/leaflet.css";
 
-function calculateDistanceKM(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-interface DriverPost {
+interface RidePost {
   id: string;
   driverName: string;
   driverPhone: string;
-  vehicleType: string;
-  vehicleCategory: 'CAR' | 'BUS' | 'LORRY' | 'BIKE' | 'CLASSIC';
-  price: string;
-  availableSeats: string;
-  startLocationName: string;
-  endLocationName: string;
-  startLat: number;
-  startLng: number;
-  endLat: number;
-  endLng: number;
-  currentLat: number;
-  currentLng: number;
-  createdAt: string;
+  isVerified: boolean;
+  vehicle: string;
+  seats: number;
+  price: number;
+  startName: string;
+  startCoords: [number, number];
+  endName: string;
+  endCoords: [number, number];
+  routePolyline: [number, number][];
+  isLadiesOnly: boolean;
+  rating: number;
+  otpCode: string;
 }
 
-export default function App() {
-  const [user, setUser] = useState<any>(null);
-  const [authMode, setAuthMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
-  const [role, setRole] = useState<'PASSENGER' | 'DRIVER'>('PASSENGER');
-
-  // Form Fields
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [phone, setPhone] = useState('');
-
-  // Driver Creation State
-  const [startLoc, setStartLoc] = useState('Colombo');
-  const [destQuery, setDestQuery] = useState('Temple of the Tooth Kandy');
-  const [vehicle, setVehicle] = useState('Toyota Axio VIP');
-  const [vehicleCat, setVehicleCat] = useState<'CAR' | 'BUS' | 'LORRY' | 'BIKE' | 'CLASSIC'>('CAR');
-  const [price, setPrice] = useState('3500');
-  const [seats, setSeats] = useState('3');
-  const [postLat, setPostLat] = useState<number>(7.2936); // Default Temple of Tooth Lat
-  const [postLng, setPostLng] = useState<number>(80.6413); // Default Temple of Tooth Lng
-  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
-
-  // Driver & Passenger Posts Storage
-  const [driverPosts, setDriverPosts] = useState<DriverPost[]>([]);
-
-  // Passenger Match State
-  const [passengerDestQuery, setPassengerDestQuery] = useState('');
-  const [passengerDestLat, setPassengerDestLat] = useState<number | null>(null);
-  const [passengerDestLng, setPassengerDestLng] = useState<number | null>(null);
-  const [passengerLiveGPS, setPassengerLiveGPS] = useState<{ lat: number; lng: number } | null>(null);
-  const [activeBookedRide, setActiveBookedRide] = useState<DriverPost | null>(null);
-
+// Map Fly-To helper
+function MapFlyTo({ coords }: { coords: [number, number] }) {
+  const map = useMap();
   useEffect(() => {
-    const savedUser = localStorage.getItem('galaxy_user');
-    if (savedUser) setUser(JSON.parse(savedUser));
-
-    const savedPosts = localStorage.getItem('galaxy_driver_posts');
-    if (savedPosts) {
-      setDriverPosts(JSON.parse(savedPosts));
-    } else {
-      const initialPosts: DriverPost[] = [
-        {
-          id: 'POST-101',
-          driverName: 'Kasun Fernando',
-          driverPhone: '0778899000',
-          vehicleType: 'Toyota Axio (Sedan)',
-          vehicleCategory: 'CAR',
-          price: '3800',
-          availableSeats: '3 Seats',
-          startLocationName: 'Colombo Fort',
-          endLocationName: 'Temple of the Tooth, Kandy',
-          startLat: 6.9344,
-          startLng: 79.8428,
-          endLat: 7.2936,
-          endLng: 80.6413,
-          currentLat: 6.9271,
-          currentLng: 79.8612,
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      setDriverPosts(initialPosts);
-      localStorage.setItem('galaxy_driver_posts', JSON.stringify(initialPosts));
+    if (coords) {
+      map.flyTo(coords, 12, { duration: 1.5 });
     }
-  }, []);
+  }, [coords, map]);
+  return null;
+}
 
-  // Location Fly-To Search Function
-  const searchLocationAndFly = async (queryName: string, isDriver: boolean) => {
-    if (!queryName || queryName.trim().length < 2) return;
-    setIsSearchingLocation(true);
+export default function GalaxyRides3D() {
+  const [activeTab, setActiveTab] = useState<"driver" | "passenger">("driver");
+
+  // Driver Form State
+  const [driverName, setDriverName] = useState("සහාන්");
+  const [driverPhone, setDriverPhone] = useState("0771234567");
+  const [vehicle, setVehicle] = useState("Toyota Prius Hybrid");
+  const [price, setPrice] = useState(1200);
+  const [seats, setSeats] = useState(3);
+  const [isLadiesOnly, setIsLadiesOnly] = useState(false);
+
+  // Locations & Coordinates State
+  const [startQuery, setStartQuery] = useState("Colombo Fort");
+  const [startCoords, setStartCoords] = useState<[number, number]>([6.9344, 79.8428]);
+
+  const [endQuery, setEndQuery] = useState("Kandy Clock Tower");
+  const [endCoords, setEndCoords] = useState<[number, number]>([7.2936, 80.6413]);
+
+  // Ride Posts List
+  const [ridePosts, setRidePosts] = useState<RidePost[]>([]);
+
+  // Passenger State
+  const [searchDestination, setSearchDestination] = useState("");
+  const [filterLadiesOnly, setFilterLadiesOnly] = useState(false);
+  const [trackingRide, setTrackingRide] = useState<RidePost | null>(null);
+  const [driverLiveLocation, setDriverLiveLocation] = useState<[number, number] | null>(null);
+  const [enteredOtp, setEnteredOtp] = useState("");
+
+  // 1. Forward Geocoding (Text -> Coordinates)
+  const geocodeLocation = async (query: string): Promise<[number, number] | null> => {
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryName)}`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          query + ", Sri Lanka"
+        )}`
       );
       const data = await res.json();
       if (data && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        if (isDriver) {
-          setPostLat(lat);
-          setPostLng(lng);
-        } else {
-          setPassengerDestLat(lat);
-          setPassengerDestLng(lng);
-        }
-      } else {
-        alert('ස්ථානය සොයාගැනීමට නොහැකි විය. වෙනත් නමක් type කරන්න.');
+        return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSearchingLocation(false);
+    } catch (err) {
+      console.error("Geocoding Error:", err);
     }
+    return null;
   };
 
-  const handleAuthSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const userData = {
-      id: 'USR-' + Date.now(),
-      firstName: firstName || (email ? email.split('@')[0] : 'User'),
-      email,
-      role,
-      phone: phone || '0770001122',
-      isVerified: true,
-    };
-    localStorage.setItem('galaxy_user', JSON.stringify(userData));
-    setUser(userData);
-  };
-
-  const handlePublishPost = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!destQuery) return alert('කරුණාකර ගමනාන්තයක් ඇතුළත් කරන්න!');
-
-    const newPost: DriverPost = {
-      id: 'POST-' + Date.now(),
-      driverName: user.firstName,
-      driverPhone: user.phone,
-      vehicleType: vehicle,
-      vehicleCategory: vehicleCat,
-      price: price,
-      availableSeats: seats,
-      startLocationName: startLoc,
-      endLocationName: destQuery,
-      startLat: 6.9271,
-      startLng: 79.8612,
-      endLat: postLat,
-      endLng: postLng,
-      currentLat: 6.9271,
-      currentLng: 79.8612,
-      createdAt: new Date().toLocaleString(),
-    };
-
-    const updated = [newPost, ...driverPosts];
-    setDriverPosts(updated);
-    localStorage.setItem('galaxy_driver_posts', JSON.stringify(updated));
-    alert('🚀 Driver Route Post එක සාර්ථකව පලකරන ලදී!');
-  };
-
-  const matchedDriverPosts = useMemo(() => {
-    if (!passengerDestQuery) return driverPosts;
-
-    const query = passengerDestQuery.toLowerCase().trim();
-
-    return driverPosts.filter((post) => {
-      const nameMatch =
-        post.endLocationName.toLowerCase().includes(query) ||
-        query.includes(post.endLocationName.toLowerCase());
-
-      let radiusMatch = false;
-      if (passengerDestLat && passengerDestLng) {
-        const dist = calculateDistanceKM(
-          passengerDestLat,
-          passengerDestLng,
-          post.endLat,
-          post.endLng
-        );
-        if (dist <= 15) radiusMatch = true;
+  // 2. Reverse Geocoding (Coordinates -> Text Name)
+  const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+      );
+      const data = await res.json();
+      if (data && data.display_name) {
+        // Return short address (e.g. Town, City)
+        const parts = data.display_name.split(",");
+        return parts.slice(0, 3).join(",");
       }
-
-      return nameMatch || radiusMatch;
-    });
-  }, [passengerDestQuery, passengerDestLat, passengerDestLng, driverPosts]);
-
-  const logout = () => {
-    localStorage.removeItem('galaxy_user');
-    setUser(null);
+    } catch (err) {
+      console.error("Reverse Geocoding Error:", err);
+    }
+    return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
   };
 
-  if (!user) {
-    return (
-      <div style={container3DStyle}>
-        <div style={glassCardStyle}>
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <h1 style={{ color: '#38bdf8', margin: '0 0 6px 0', fontSize: '28px', fontWeight: '800' }}>
-              🌌 Galaxy Rides 3D
-            </h1>
-            <p style={{ color: '#94a3b8', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              AI-Driven Multi-Modal Ride Platform
-            </p>
-          </div>
+  // Auto-update Start Coords on Type Change
+  const handleStartSearch = async () => {
+    const coords = await geocodeLocation(startQuery);
+    if (coords) setStartCoords(coords);
+  };
 
-          <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.8)', padding: '4px', borderRadius: '12px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <button
-              type="button"
-              onClick={() => setAuthMode('LOGIN')}
-              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: authMode === 'LOGIN' ? '#0284c7' : 'transparent', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
-            >
-              🔑 Login
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuthMode('SIGNUP')}
-              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: authMode === 'SIGNUP' ? '#0284c7' : 'transparent', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
-            >
-              📝 Sign Up
-            </button>
-          </div>
+  // Auto-update End Coords on Type Change
+  const handleEndSearch = async () => {
+    const coords = await geocodeLocation(endQuery);
+    if (coords) setEndCoords(coords);
+  };
 
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-            <button
-              type="button"
-              onClick={() => setRole('PASSENGER')}
-              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: role === 'PASSENGER' ? '1px solid #38bdf8' : '1px solid transparent', background: role === 'PASSENGER' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(30, 41, 59, 0.5)', color: '#fff', fontWeight: '600', cursor: 'pointer' }}
-            >
-              🧍 Passenger
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('DRIVER')}
-              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: role === 'DRIVER' ? '1px solid #38bdf8' : '1px solid transparent', background: role === 'DRIVER' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(30, 41, 59, 0.5)', color: '#fff', fontWeight: '600', cursor: 'pointer' }}
-            >
-              🚗 Driver
-            </button>
-          </div>
+  // Publish Ride Handler
+  const handlePublishRide = () => {
+    const newRide: RidePost = {
+      id: Date.now().toString(),
+      driverName,
+      driverPhone,
+      isVerified: true,
+      vehicle,
+      seats,
+      price,
+      startName: startQuery,
+      startCoords,
+      endName: endQuery,
+      endCoords,
+      routePolyline: [startCoords, endCoords],
+      isLadiesOnly,
+      rating: 4.9,
+      otpCode: Math.floor(1000 + Math.random() * 9000).toString(),
+    };
 
-          <form onSubmit={handleAuthSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {authMode === 'SIGNUP' && (
-              <>
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  required
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  style={input3DStyle}
-                />
-                <input
-                  type="text"
-                  placeholder="Phone Number (WhatsApp)"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  style={input3DStyle}
-                />
-              </>
-            )}
+    setRidePosts([newRide, ...ridePosts]);
+    alert("🎉 ඔබගේ Ride එක සාර්ථකව Publish කරන ලදී!");
+    setActiveTab("passenger");
+  };
 
-            <input
-              type="email"
-              placeholder="Email Address"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={input3DStyle}
-            />
+  // Live GPS Watcher
+  useEffect(() => {
+    let watchId: number;
+    if (trackingRide && "geolocation" in navigator) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => setDriverLiveLocation([pos.coords.latitude, pos.coords.longitude]),
+        (err) => console.error(err),
+        { enableHighAccuracy: true }
+      );
+    }
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [trackingRide]);
 
-            <input
-              type="password"
-              placeholder="Password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={input3DStyle}
-            />
-
-            <button type="submit" style={button3DStyle}>
-              {authMode === 'LOGIN' ? `Login as ${role}` : `Create ${role} Account`}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  const filteredRides = ridePosts.filter((ride) => {
+    const matchesDest =
+      searchDestination === "" ||
+      ride.endName.toLowerCase().includes(searchDestination.toLowerCase());
+    const matchesLadies = filterLadiesOnly ? ride.isLadiesOnly : true;
+    return matchesDest && matchesLadies;
+  });
 
   return (
-    <div style={{ minHeight: '100vh', background: '#020617', color: '#e2e8f0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <nav style={{ padding: '16px 24px', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#38bdf8' }}>🌌 Galaxy Rides 3D</span>
-          <span style={{ fontSize: '10px', background: '#0284c7', color: '#fff', padding: '2px 8px', borderRadius: '20px', fontWeight: 'bold' }}>LIVE</span>
+    <div style={{ fontFamily: "sans-serif", backgroundColor: "#0f172a", color: "#f8fafc", minHeight: "100vh", padding: "20px" }}>
+      <header style={{ textAlign: "center", marginBottom: "20px" }}>
+        <h1 style={{ fontSize: "2.2rem", color: "#38bdf8", margin: "0" }}>🌌 Galaxy Rides 3D</h1>
+        <p style={{ color: "#94a3b8" }}>Real-time Smart Carpooling & Interactive Pin Map</p>
+
+        <div style={{ marginTop: "15px", display: "flex", justifyContent: "center", gap: "10px" }}>
+          <button
+            onClick={() => setActiveTab("driver")}
+            style={{ padding: "10px 24px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", backgroundColor: activeTab === "driver" ? "#0284c7" : "#334155", color: "#fff" }}
+          >
+            🚗 Driver (ගමනක් Publish කරන්න)
+          </button>
+          <button
+            onClick={() => setActiveTab("passenger")}
+            style={{ padding: "10px 24px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", backgroundColor: activeTab === "passenger" ? "#0284c7" : "#334155", color: "#fff" }}
+          >
+            🔍 Passenger (Rides සොයන්න)
+          </button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '13px', color: '#94a3b8' }}>👤 {user.firstName} ({user.role})</span>
-          <button onClick={logout} style={{ padding: '6px 12px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', borderRadius: '8px', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>Logout</button>
-        </div>
-      </nav>
+      </header>
 
-      <div style={{ maxWidth: '900px', margin: '24px auto', padding: '0 16px' }}>
+      {/* DRIVER PANEL */}
+      {activeTab === "driver" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", maxWidth: "1200px", margin: "0 auto" }}>
+          <div style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
+            <h2 style={{ color: "#38bdf8", marginTop: "0" }}>1. ගමනේ විස්තර ඇතුලත් කරන්න</h2>
 
-        {/* DRIVER TRIP CREATOR PANEL */}
-        {user.role === 'DRIVER' && (
-          <div style={glassPanelStyle}>
-            <h3 style={{ color: '#38bdf8', margin: '0 0 16px 0', fontSize: '18px' }}>📢 Post Your Route & Destination</h3>
-
-            <form onSubmit={handlePublishPost} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <input type="text" placeholder="Start City (e.g. Colombo)" value={startLoc} onChange={(e) => setStartLoc(e.target.value)} style={input3DStyle} />
-                <div style={{ display: 'flex', flex: 1, gap: '6px' }}>
-                  <input
-                    type="text"
-                    placeholder="Ending Location (e.g. Temple of Tooth Kandy)"
-                    value={destQuery}
-                    onChange={(e) => setDestQuery(e.target.value)}
-                    style={input3DStyle}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => searchLocationAndFly(destQuery, true)}
-                    style={{ padding: '0 16px', background: '#0284c7', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 'bold', cursor: 'pointer', minWidth: '90px' }}
-                  >
-                    {isSearchingLocation ? 'Flying...' : '✈️ Fly Map'}
-                  </button>
-                </div>
+            {/* Start Location Input */}
+            <div style={{ marginBottom: "12px" }}>
+              <label style={{ display: "block", fontSize: "0.9rem", color: "#cbd5e1" }}>Start Location (ආරම්භය)</label>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <input
+                  type="text"
+                  value={startQuery}
+                  onChange={(e) => setStartQuery(e.target.value)}
+                  style={{ flex: 1, padding: "10px", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", color: "#fff" }}
+                />
+                <button onClick={handleStartSearch} style={{ padding: "10px", background: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" }}>🔍 Go</button>
               </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <select value={vehicleCat} onChange={(e: any) => setVehicleCat(e.target.value)} style={input3DStyle}>
-                  <option value="CAR">🚗 Passenger Car / SUV</option>
-                  <option value="BUS">🚌 Bus / Mini Coach</option>
-                  <option value="LORRY">🚚 Lorry / Cargo Truck</option>
-                  <option value="BIKE">📦 Bike / Express Courier</option>
-                  <option value="CLASSIC">🚙 Classic / Budget Ride</option>
-                </select>
-
-                <input type="text" placeholder="Vehicle Name" value={vehicle} onChange={(e) => setVehicle(e.target.value)} style={input3DStyle} />
-                <input type="text" placeholder="Price (LKR)" value={price} onChange={(e) => setPrice(e.target.value)} style={input3DStyle} />
-              </div>
-
-              {/* DYNAMIC AUTO-FLY MAP VIEW */}
-              <div style={{ height: '280px', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(56, 189, 248, 0.4)', marginTop: '6px', position: 'relative' }}>
-                {/* @ts-ignore */}
-                <DynamicMapContainer center={[postLat, postLng]} zoom={15} style={{ height: '100%', width: '100%' }}>
-                  {/* @ts-ignore */}
-                  <DynamicTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  {/* @ts-ignore */}
-                  <MapFlyToController center={[postLat, postLng]} />
-                  {/* @ts-ignore */}
-                  <DynamicMarker
-                    position={[postLat, postLng]}
-                    draggable={true}
-                    eventHandlers={{
-                      dragend: (e: any) => {
-                        const marker = e.target;
-                        const position = marker.getLatLng();
-                        setPostLat(position.lat);
-                        setPostLng(position.lng);
-                      },
-                    }}
-                  >
-                    {/* @ts-ignore */}
-                    <DynamicPopup>📍 Target Destination Pin ({destQuery})</DynamicPopup>
-                  </DynamicMarker>
-                </DynamicMapContainer>
-              </div>
-
-              <button type="submit" style={button3DStyle}>🚀 Publish Route Post</button>
-            </form>
-          </div>
-        )}
-
-        {/* PASSENGER SEARCH PANEL */}
-        {user.role === 'PASSENGER' && (
-          <div style={glassPanelStyle}>
-            <h3 style={{ color: '#38bdf8', margin: '0 0 16px 0', fontSize: '18px' }}>🔍 Search Destination Route</h3>
-            
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <input
-                type="text"
-                placeholder="Where do you want to go? (e.g. Kandy / Galle)"
-                value={passengerDestQuery}
-                onChange={(e) => {
-                  setPassengerDestQuery(e.target.value);
-                  searchLocationAndFly(e.target.value, false);
-                }}
-                style={{ ...input3DStyle, flex: 1 }}
-              />
-              <button
-                type="button"
-                onClick={() => searchLocationAndFly(passengerDestQuery, false)}
-                style={{ padding: '0 24px', background: '#0284c7', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                Search
-              </button>
             </div>
-          </div>
-        )}
 
-        {/* MATCHED LISTINGS */}
-        <h3 style={{ margin: '20px 0 12px 0', fontSize: '18px', color: '#94a3b8' }}>
-          Available Route Drivers ({matchedDriverPosts.length})
-        </h3>
+            {/* End Location Input */}
+            <div style={{ marginBottom: "12px" }}>
+              <label style={{ display: "block", fontSize: "0.9rem", color: "#cbd5e1" }}>Ending Location (ගමනාන්තය)</label>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <input
+                  type="text"
+                  value={endQuery}
+                  onChange={(e) => setEndQuery(e.target.value)}
+                  style={{ flex: 1, padding: "10px", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", color: "#fff" }}
+                />
+                <button onClick={handleEndSearch} style={{ padding: "10px", background: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" }}>🔍 Go</button>
+              </div>
+            </div>
 
-        {matchedDriverPosts.length === 0 ? (
-          <div style={{ padding: '30px', background: 'rgba(30, 41, 59, 0.4)', borderRadius: '16px', textAlign: 'center', color: '#64748b' }}>
-            ඔබ සොයන ගමනාන්තයට හෝ ආසන්නයට යන Drivers ලා දැනට නොමැත.
+            <p style={{ color: "#38bdf8", fontSize: "0.85rem", margin: "8px 0" }}>
+              💡 <b>Tip:</b> Map එකේ ඇති Markers (🟢 Start / 🔴 End) Drag කරලා ඔයාට අවශ්‍ය නිවැරදිම තැනට තියන්න. නම Auto Update වේ!
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px", marginTop: "16px" }}>
+              <div>
+                <label style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>වාහනය</label>
+                <input type="text" value={vehicle} onChange={(e) => setVehicle(e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", color: "#fff" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>ගාන (LKR)</label>
+                <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", color: "#fff" }} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "12px" }}>
+              <label style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>ඇත ඇති අසුන් ගණන (Seats)</label>
+              <input type="number" value={seats} onChange={(e) => setSeats(Number(e.target.value))} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", color: "#fff" }} />
+            </div>
+
+            <div style={{ marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <input type="checkbox" id="ladiesOnly" checked={isLadiesOnly} onChange={(e) => setIsLadiesOnly(e.target.checked)} />
+              <label htmlFor="ladiesOnly" style={{ color: "#f472b6", fontWeight: "bold" }}>🌸 Ladies-Only Ride (කාන්තාවන්ට පමණි)</label>
+            </div>
+
+            <button
+              onClick={handlePublishRide}
+              style={{ width: "100%", padding: "14px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}
+            >
+              🚀 Publish Route Live
+            </button>
           </div>
-        ) : (
-          matchedDriverPosts.map((post) => (
-            <div key={post.id} style={card3DStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '18px' }}>
-                      {post.vehicleCategory === 'CAR' && '🚗'}
-                      {post.vehicleCategory === 'BUS' && '🚌'}
-                      {post.vehicleCategory === 'LORRY' && '🚚'}
-                      {post.vehicleCategory === 'BIKE' && '📦'}
-                      {post.vehicleCategory === 'CLASSIC' && '🚙'}
-                    </span>
-                    <h4 style={{ margin: 0, color: '#38bdf8', fontSize: '18px' }}>{post.vehicleType}</h4>
-                    <span style={{ fontSize: '11px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '12px' }}>
-                      {post.driverName}
-                    </span>
+
+          {/* Interactive Map with BOTH Markers Draggable */}
+          <div style={{ height: "480px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
+            <MapContainer center={startCoords} zoom={9} style={{ height: "100%", width: "100%" }}>
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <MapFlyTo coords={endCoords} />
+
+              {/* 🟢 DRAGGABLE START MARKER */}
+              <Marker
+                position={startCoords}
+                draggable={true}
+                eventHandlers={{
+                  dragend: async (e) => {
+                    const pos = e.target.getLatLng();
+                    setStartCoords([pos.lat, pos.lng]);
+                    const placeName = await reverseGeocode(pos.lat, pos.lng);
+                    setStartQuery(placeName);
+                  },
+                }}
+              >
+                <Popup>🟢 Start Position (Drag me!)</Popup>
+              </Marker>
+
+              {/* 🔴 DRAGGABLE END MARKER */}
+              <Marker
+                position={endCoords}
+                draggable={true}
+                eventHandlers={{
+                  dragend: async (e) => {
+                    const pos = e.target.getLatLng();
+                    setEndCoords([pos.lat, pos.lng]);
+                    const placeName = await reverseGeocode(pos.lat, pos.lng);
+                    setEndQuery(placeName);
+                  },
+                }}
+              >
+                <Popup>🔴 Destination (Drag me!)</Popup>
+              </Marker>
+
+              <Polyline positions={[startCoords, endCoords]} color="#38bdf8" weight={4} dashArray="8, 8" />
+            </MapContainer>
+          </div>
+        </div>
+      )}
+
+      {/* PASSENGER PANEL */}
+      {activeTab === "passenger" && (
+        <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+          <div style={{ background: "#1e293b", padding: "16px", borderRadius: "12px", marginBottom: "20px", display: "flex", gap: "10px", alignItems: "center" }}>
+            <input
+              type="text"
+              placeholder="ඔබට යායුතු ගමනාන්තය සෝයන්න... (e.g. Kandy)"
+              value={searchDestination}
+              onChange={(e) => setSearchDestination(e.target.value)}
+              style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #475569", background: "#0f172a", color: "#fff" }}
+            />
+            <button
+              onClick={() => setFilterLadiesOnly(!filterLadiesOnly)}
+              style={{ padding: "12px 16px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", backgroundColor: filterLadiesOnly ? "#ec4899" : "#334155", color: "#fff" }}
+            >
+              🌸 {filterLadiesOnly ? "Ladies-Only Filtered" : "Filter: Ladies Only"}
+            </button>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {filteredRides.length === 0 ? (
+              <p style={{ textAlign: "center", color: "#94a3b8" }}>දැනට කිසිදු Ride එකක් පළකර නොමැත. (Driver ලෙස ලොග් වී Ride එකක් Publish කරන්න)</p>
+            ) : (
+              filteredRides.map((ride) => (
+                <div key={ride.id} style={{ background: "#1e293b", padding: "18px", borderRadius: "12px", border: "1px solid #334155", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <h3 style={{ margin: "0", color: "#38bdf8" }}>{ride.driverName} {ride.isVerified && "✅ (Verified Driver)"}</h3>
+                      <p style={{ margin: "4px 0", color: "#94a3b8", fontSize: "0.9rem" }}>🚘 {ride.vehicle} | ⭐ {ride.rating} Rating</p>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontSize: "1.4rem", fontWeight: "bold", color: "#4ade80" }}>LKR {ride.price}</span>
+                      <p style={{ margin: "0", color: "#cbd5e1", fontSize: "0.85rem" }}>{ride.seats} Seats Available</p>
+                    </div>
                   </div>
 
-                  <p style={{ margin: '4px 0', fontSize: '14px', color: '#cbd5e1' }}>
-                    🚩 Start: <strong>{post.startLocationName}</strong> ➔ 🏁 Target: <strong>{post.endLocationName}</strong>
+                  <p style={{ margin: "0", color: "#cbd5e1" }}>
+                    <b>Route:</b> {ride.startName} ➔ {ride.endName}
                   </p>
-                  <p style={{ margin: '4px 0', fontSize: '13px', color: '#94a3b8' }}>
-                    📞 Contact: <strong>{post.driverPhone}</strong>
-                  </p>
-                </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#34d399' }}>LKR {post.price}</div>
-                  {user.role === 'PASSENGER' && (
+                  <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
                     <button
-                      onClick={() => setActiveBookedRide(post)}
-                      style={{ marginTop: '10px', padding: '8px 16px', background: '#10b981', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+                      onClick={() => setTrackingRide(ride)}
+                      style={{ flex: 1, padding: "10px", background: "#059669", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}
                     >
-                      Track Live Map
+                      📡 Track Route & Live Moving Car
                     </button>
+                  </div>
+
+                  {trackingRide?.id === ride.id && (
+                    <div style={{ marginTop: "16px", background: "#0f172a", padding: "16px", borderRadius: "8px", border: "1px solid #0284c7" }}>
+                      <h4 style={{ color: "#38bdf8", marginTop: "0" }}>📡 Live Real-Time Tracking & Safety</h4>
+
+                      <div style={{ height: "300px", borderRadius: "8px", overflow: "hidden", marginBottom: "12px" }}>
+                        <MapContainer center={ride.startCoords} zoom={11} style={{ height: "100%", width: "100%" }}>
+                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                          <Marker position={ride.startCoords}><Popup>Start: {ride.startName}</Popup></Marker>
+                          <Marker position={ride.endCoords}><Popup>Destination: {ride.endName}</Popup></Marker>
+                          {driverLiveLocation && (
+                            <Marker position={driverLiveLocation}>
+                              <Popup>🚘 Driver ඉන්නේ මෙතනයි! (Live GPS)</Popup>
+                            </Marker>
+                          )}
+                          <Polyline positions={ride.routePolyline} color="#38bdf8" />
+                        </MapContainer>
+                      </div>
+
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        <button
+                          onClick={() => {
+                            const shareUrl = `${window.location.origin}/track?rideId=${ride.id}`;
+                            navigator.clipboard.writeText(shareUrl);
+                            alert("🔗 Live Trip Link එක Copy විය!");
+                          }}
+                          style={{ flex: 1, padding: "10px", background: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}
+                        >
+                          📲 Share Live Trip Link
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            if (confirm("🚨 හදිසි අවස්ථාවක්ද? 119 පොලිස් සේවාව අමතන්නද?")) {
+                              window.location.href = "tel:119";
+                            }
+                          }}
+                          style={{ padding: "10px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}
+                        >
+                          🚨 SOS EMERGENCY
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
-
-              {activeBookedRide?.id === post.id && (
-                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '12px', border: '1px solid #10b981' }}>
-                  <p style={{ color: '#34d399', fontSize: '13px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
-                    📍 Real-Time Mutual Live GPS Tracking Enabled
-                  </p>
-                  <div style={{ height: '240px', borderRadius: '10px', overflow: 'hidden' }}>
-                    {/* @ts-ignore */}
-                    <DynamicMapContainer center={[post.endLat, post.endLng]} zoom={14} style={{ height: '100%', width: '100%' }}>
-                      {/* @ts-ignore */}
-                      <DynamicTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      {/* @ts-ignore */}
-                      <DynamicMarker position={[post.endLat, post.endLng]}>
-                        {/* @ts-ignore */}
-                        <DynamicPopup>🏁 Target Destination ({post.endLocationName})</DynamicPopup>
-                      </DynamicMarker>
-                    </DynamicMapContainer>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-const container3DStyle: React.CSSProperties = {
-  minHeight: '100vh',
-  background: 'radial-gradient(circle at center, #0f172a 0%, #020617 100%)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '20px',
-};
-
-const glassCardStyle: React.CSSProperties = {
-  width: '100%',
-  maxWidth: '420px',
-  background: 'rgba(30, 41, 59, 0.75)',
-  backdropFilter: 'blur(20px)',
-  borderRadius: '24px',
-  padding: '32px',
-  border: '1px solid rgba(255,255,255,0.12)',
-  boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-};
-
-const glassPanelStyle: React.CSSProperties = {
-  background: 'rgba(30, 41, 59, 0.6)',
-  backdropFilter: 'blur(16px)',
-  padding: '24px',
-  borderRadius: '20px',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  marginBottom: '24px',
-};
-
-const card3DStyle: React.CSSProperties = {
-  background: 'rgba(15, 23, 42, 0.85)',
-  backdropFilter: 'blur(12px)',
-  padding: '20px',
-  borderRadius: '16px',
-  border: '1px solid rgba(255, 255, 255, 0.08)',
-  marginBottom: '16px',
-  boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-};
-
-const input3DStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '12px 16px',
-  borderRadius: '10px',
-  border: '1px solid rgba(255, 255, 255, 0.15)',
-  background: 'rgba(15, 23, 42, 0.8)',
-  color: '#fff',
-  outline: 'none',
-  fontSize: '14px',
-};
-
-const button3DStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '14px',
-  borderRadius: '12px',
-  border: 'none',
-  backgroundColor: '#0284c7',
-  color: '#fff',
-  fontWeight: 'bold',
-  fontSize: '15px',
-  cursor: 'pointer',
-  boxShadow: '0 4px 15px rgba(2, 132, 199, 0.4)',
-};
