@@ -132,12 +132,18 @@ export default function GalaxyRides3D() {
 
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Load Leaflet Icons & CSS ONLY on Client Side
+  // Load Leaflet Icons & Dynamic CSS CDN safely on Client Side
   useEffect(() => {
-    import("leaflet").then((L) => {
-      // Import leaflet CSS dynamically on client side
-      import("leaflet/dist/leaflet.css");
+    // Dynamically append Leaflet CSS to DOM (Fixes TypeScript import error)
+    if (!document.getElementById("leaflet-css")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-css";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
 
+    import("leaflet").then((L) => {
       const green = new L.Icon({
         iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
         shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
