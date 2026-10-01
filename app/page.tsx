@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 
+// Dynamically import Leaflet components to avoid SSR 'window is not defined' error
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   { ssr: false }
@@ -24,7 +25,7 @@ const Polyline = dynamic(
   { ssr: false }
 );
 
-// Map Dynamic Controller Component
+// Map FlyToBounds / FlyTo Controller Component
 const MapFlyTo = dynamic(
   () =>
     import("react-leaflet").then((mod) => {
@@ -53,28 +54,6 @@ const MapFlyTo = dynamic(
     }),
   { ssr: false }
 );
-
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-
-// Leaflet Icons Setup
-const greenIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-const redIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
 
 interface User {
   name: string;
@@ -148,8 +127,52 @@ export default function GalaxyRides3D() {
   const [passengerSuggestions, setPassengerSuggestions] = useState<Suggestion[]>([]);
   const [searchDestination, setSearchDestination] = useState("");
 
-  // Live Auto-Suggestion API with Debounce
+  const [greenIcon, setGreenIcon] = useState<any>(null);
+  const [redIcon, setRedIcon] = useState<any>(null);
+
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Load Leaflet Icons & CSS ONLY on Client Side
+  useEffect(() => {
+    import("leaflet").then((L) => {
+      // Import leaflet CSS dynamically on client side
+      import("leaflet/dist/leaflet.css");
+
+      const green = new L.Icon({
+        iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
+        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41],
+      });
+
+      const red = new L.Icon({
+        iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41],
+      });
+
+      setGreenIcon(green);
+      setRedIcon(red);
+    });
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const coords: [number, number] = [lat, lng];
+          setStartCoords(coords);
+          setPassengerCoords(coords);
+        },
+        (err) => console.log("GPS Location Permission Pending")
+      );
+    }
+  }, []);
 
   const fetchSuggestions = (query: string, setFn: (suggestions: Suggestion[]) => void) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -173,22 +196,6 @@ export default function GalaxyRides3D() {
       }
     }, 300);
   };
-
-  // Auto Get Live Location on Load
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const coords: [number, number] = [lat, lng];
-          setStartCoords(coords);
-          setPassengerCoords(coords);
-        },
-        (err) => console.log("GPS Location Permisson Pending/Denied")
-      );
-    }
-  }, []);
 
   const selectStartSuggestion = (s: Suggestion) => {
     const coords: [number, number] = [parseFloat(s.lat), parseFloat(s.lon)];
@@ -216,7 +223,6 @@ export default function GalaxyRides3D() {
     setPassengerSuggestions([]);
   };
 
-  // Get Current Location Button Trigger
   const handleFindMyLocation = (isPassengerMode = false) => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -241,7 +247,6 @@ export default function GalaxyRides3D() {
     }
   };
 
-  // Fetch OSRM Real Driving Route & Auto Fly
   const updateRouteAndBounds = async (start: [number, number], end: [number, number]) => {
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
@@ -258,7 +263,6 @@ export default function GalaxyRides3D() {
         const distInKm = (data.routes[0].distance / 1000).toFixed(1);
         setRouteDistance(`${distInKm} km`);
 
-        // Instant Auto-Fly Bounds from Start to End
         setMapBounds([
           [Math.min(start[0], end[0]), Math.min(start[1], end[1])],
           [Math.max(start[0], end[0]), Math.max(start[1], end[1])],
@@ -451,7 +455,6 @@ export default function GalaxyRides3D() {
               </button>
             </div>
 
-            {/* Start Location Input */}
             <div style={{ marginBottom: "16px", position: "relative" }}>
               <label style={{ display: "block", fontSize: "0.85rem", color: "#cbd5e1", marginBottom: "4px" }}>
                 📍 Start Location (Optional - Default: Live GPS)
@@ -481,7 +484,6 @@ export default function GalaxyRides3D() {
               )}
             </div>
 
-            {/* End Location Input with Dynamic Auto Suggestions */}
             <div style={{ marginBottom: "16px", position: "relative" }}>
               <label style={{ display: "block", fontSize: "0.85rem", color: "#cbd5e1", marginBottom: "4px" }}>
                 🏁 Destination Location (e.g. type "nuwara")
@@ -546,21 +548,23 @@ export default function GalaxyRides3D() {
             </button>
           </div>
 
-          {/* Interactive Live Map */}
           <div style={{ height: "520px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
             <MapContainer bounds={mapBounds} style={{ height: "100%", width: "100%" }}>
               <MapFlyTo bounds={mapBounds} />
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-              <Marker position={startCoords} icon={greenIcon}>
-                <Popup>🟢 Start: {startQuery}</Popup>
-              </Marker>
+              {greenIcon && (
+                <Marker position={startCoords} icon={greenIcon}>
+                  <Popup>🟢 Start: {startQuery}</Popup>
+                </Marker>
+              )}
 
-              <Marker position={endCoords} icon={redIcon}>
-                <Popup>🔴 Destination: {endQuery}</Popup>
-              </Marker>
+              {redIcon && (
+                <Marker position={endCoords} icon={redIcon}>
+                  <Popup>🔴 Destination: {endQuery}</Popup>
+                </Marker>
+              )}
 
-              {/* Road Path Highlight Line */}
               {roadRoute.length > 0 && (
                 <Polyline positions={roadRoute} pathOptions={{ color: "#2563eb", weight: 6, opacity: 0.85 }} />
               )}
@@ -583,7 +587,6 @@ export default function GalaxyRides3D() {
               </button>
             </div>
 
-            {/* Passenger Live Location Search */}
             <div style={{ marginBottom: "12px", position: "relative" }}>
               <label style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>Your Pickup Point</label>
               <input
@@ -666,17 +669,21 @@ export default function GalaxyRides3D() {
                           <MapFlyTo bounds={fitBounds} />
                           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-                          <Marker position={ride.startCoords} icon={greenIcon}>
-                            <Popup>🚗 <b>Driver Location</b></Popup>
-                          </Marker>
+                          {greenIcon && (
+                            <Marker position={ride.startCoords} icon={greenIcon}>
+                              <Popup>🚗 <b>Driver Location</b></Popup>
+                            </Marker>
+                          )}
 
-                          <Marker position={ride.endCoords} icon={redIcon}>
-                            <Popup>🔴 Destination</Popup>
-                          </Marker>
+                          {redIcon && (
+                            <Marker position={ride.endCoords} icon={redIcon}>
+                              <Popup>🔴 Destination</Popup>
+                            </Marker>
+                          )}
 
                           {ride.bookedBy && (
                             <Marker position={ride.bookedBy.passengerCoords}>
-                              <Popup>🙋‍♂️ <b>Your Pickup Point</b></Popup>
+                              <Popup>🙋‍♂️️ <b>Your Pickup Point</b></Popup>
                             </Marker>
                           )}
 
