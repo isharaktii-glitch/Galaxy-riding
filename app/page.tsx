@@ -583,7 +583,7 @@ export default function GalaxyRides3D() {
       <div
         style={{
           display: "flex",
-          justify: "space-between",
+          justifyContent: "space-between",
           alignItems: "center",
           marginBottom: "15px",
           background: "#1e293b",
@@ -1373,7 +1373,7 @@ export default function GalaxyRides3D() {
                             fontSize: "0.85rem",
                           }}
                         >
-                          🗺️️ {item.display_name}
+                          🗺 {item.display_name}
                         </li>
                       ))}
                     </ul>
