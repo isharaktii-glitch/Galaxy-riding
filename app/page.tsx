@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 
-// Dynamic Imports for Leaflet Map Components
+// Leaflet Dynamic Components
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   { ssr: false }
@@ -96,7 +96,7 @@ export default function GalaxyRides3D() {
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
   const [currentTab, setCurrentTab] = useState<"dashboard" | "kyc">("dashboard");
 
-  // User Inputs
+  // Registration & User Inputs
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -105,7 +105,7 @@ export default function GalaxyRides3D() {
   const [selectedRole, setSelectedRole] = useState<"passenger" | "driver">("driver");
   const [passError, setPassError] = useState("");
 
-  // Driver KYC States
+  // Driver KYC & Camera Verification States
   const [nicNumber, setNicNumber] = useState("");
   const [idPhotoUrl, setIdPhotoUrl] = useState("");
   const [liveFacePhoto, setLiveFacePhoto] = useState<string | null>(null);
@@ -117,7 +117,7 @@ export default function GalaxyRides3D() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Map & Location States (Defaults: Colombo Fort & Embilipitiya)
+  // Ride & Map Location States
   const [vehicle, setVehicle] = useState("Toyota Prius Hybrid");
   const [price, setPrice] = useState(1200);
 
@@ -146,7 +146,7 @@ export default function GalaxyRides3D() {
     }
   }, []);
 
-  // OSRM Real Driving Route Fetcher
+  // Fetch Road Polyline (OSRM Routing API)
   const fetchRoadRoute = async (start: [number, number], end: [number, number]) => {
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
@@ -176,7 +176,7 @@ export default function GalaxyRides3D() {
     }
   }, [startCoords, endCoords, isClient]);
 
-  // Enhanced Suggestions Search for Entire Sri Lanka
+  // Sri Lanka Location Suggestion Search API
   const fetchSuggestions = async (query: string, setFn: (data: Suggestion[]) => void) => {
     if (query.trim().length < 2) return setFn([]);
     try {
@@ -223,7 +223,7 @@ export default function GalaxyRides3D() {
     setCurrentTab("dashboard");
   };
 
-  // Camera Functions
+  // Live Camera Controls
   const startLiveCamera = async () => {
     setIsCameraActive(true);
     try {
@@ -306,7 +306,7 @@ export default function GalaxyRides3D() {
 
   return (
     <div style={{ fontFamily: "sans-serif", backgroundColor: "#0f172a", color: "#f8fafc", minHeight: "100vh", padding: "15px" }}>
-      {/* Navbar */}
+      {/* Top Navbar */}
       <div style={navStyle}>
         <h2 style={{ color: "#38bdf8", margin: 0 }}>🌌 Galaxy Rides 3D</h2>
         <div style={{ display: "flex", gap: "8px" }}>
@@ -332,7 +332,7 @@ export default function GalaxyRides3D() {
       </div>
 
       {!currentUser ? (
-        /* LOGIN & REGISTER CONTAINER */
+        /* Login / Register Card */
         <div style={centerFlex}>
           <div style={cardStyle}>
             <div style={{ display: "flex", borderBottom: "2px solid #334155", marginBottom: "15px" }}>
@@ -374,7 +374,7 @@ export default function GalaxyRides3D() {
 
             <form onSubmit={handleAuthSubmit} style={formStyle}>
               <div>
-                <label style={labelStyle}>ඔබ ලියාපදිංචි වන්නේ කෙසේද?</label>
+                <label style={labelStyle}>ඔබ ලියාපදිංචි වන්නේ කෙසේද? (Select Role)</label>
                 <div style={{ display: "flex", gap: "10px", marginBottom: "5px" }}>
                   <button
                     type="button"
@@ -434,7 +434,7 @@ export default function GalaxyRides3D() {
           </div>
         </div>
       ) : (
-        /* DASHBOARD AND MAP VIEW */
+        /* Main Dashboard & Map View */
         <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
           <div style={{ ...cardStyle, maxWidth: "100%", marginBottom: "15px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
@@ -481,12 +481,12 @@ export default function GalaxyRides3D() {
               </form>
             </div>
           ) : (
-            /* Ride Route Publisher & Interactive Map */
+            /* Ride Publisher and Map Component */
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "15px" }}>
               <div style={{ ...cardStyle, maxWidth: "100%" }}>
                 <h3 style={{ color: "#38bdf8", marginTop: 0 }}>🚗 Ride Route Publisher</h3>
 
-                {/* Start Location Input */}
+                {/* Start Location Box with Auto-suggestions */}
                 <div style={{ marginBottom: "10px", position: "relative" }}>
                   <label style={labelStyle}>Start Location</label>
                   <input
@@ -519,7 +519,7 @@ export default function GalaxyRides3D() {
                   )}
                 </div>
 
-                {/* End Destination Input */}
+                {/* End Location Box with Auto-suggestions */}
                 <div style={{ marginBottom: "10px", position: "relative" }}>
                   <label style={labelStyle}>End Destination</label>
                   <input
@@ -565,7 +565,7 @@ export default function GalaxyRides3D() {
 
                 <button onClick={handlePublishRide} style={primaryBtn}>🚀 Publish Ride Route</button>
 
-                {/* Active Rides List */}
+                {/* Active Rides Feed */}
                 <h4 style={{ color: "#38bdf8", marginTop: "15px", marginBottom: "8px" }}>📢 Active Published Rides</h4>
                 <div style={{ maxHeight: "200px", overflowY: "auto" }}>
                   {ridePosts.map((ride) => (
@@ -588,7 +588,7 @@ export default function GalaxyRides3D() {
                 </div>
               </div>
 
-              {/* MAP WITH LIVE REAL ROAD ROUTING */}
+              {/* Map Canvas */}
               <div style={{ height: "550px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
                 <MapContainer center={startCoords} zoom={8} style={{ height: "100%", width: "100%" }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -609,7 +609,7 @@ export default function GalaxyRides3D() {
   );
 }
 
-// Layout Styles
+// Styling Constants
 const centerFlex = { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "75vh" };
 const cardStyle = { background: "#1e293b", padding: "20px", borderRadius: "16px", border: "1px solid #334155", width: "100%", maxWidth: "450px", boxSizing: "border-box" as const };
 const formStyle = { display: "flex", flexDirection: "column" as const, gap: "10px" };
