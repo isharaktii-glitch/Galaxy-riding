@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 
 const MapContainer = dynamic(
@@ -23,8 +23,28 @@ const Polyline = dynamic(
   () => import("react-leaflet").then((mod) => mod.Polyline),
   { ssr: false }
 );
-const useMap = dynamic(
-  () => import("react-leaflet").then((mod) => mod.useMap),
+
+// Map Dynamic Controller Component using leaflet instance directly
+const MapFlyTo = dynamic(
+  () =>
+    import("react-leaflet").then((mod) => {
+      const Component = ({
+        center,
+        zoom,
+      }: {
+        center: [number, number];
+        zoom: number;
+      }) => {
+        const map = mod.useMap();
+        useEffect(() => {
+          if (map && center) {
+            map.flyTo(center, zoom, { animate: true, duration: 1.5 });
+          }
+        }, [center, zoom, map]);
+        return null;
+      };
+      return Component;
+    }),
   { ssr: false }
 );
 
@@ -63,24 +83,6 @@ interface RidePost {
   };
 }
 
-// Map Controller for Flying / Zooming smoothly to selected locations
-function MapController({
-  center,
-  zoom = 15,
-}: {
-  center: [number, number];
-  zoom?: number;
-}) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const map = (useMap as any)();
-  useEffect(() => {
-    if (map && center) {
-      map.flyTo(center, zoom, { animate: true, duration: 1.5 });
-    }
-  }, [center, zoom, map]);
-  return null;
-}
-
 export default function GalaxyRides3D() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -113,10 +115,10 @@ export default function GalaxyRides3D() {
   const [ridePosts, setRidePosts] = useState<RidePost[]>([]);
   const [searchDestination, setSearchDestination] = useState("");
 
-  // Passenger Live Location for PickMe style booking
-  const [passengerCoords, setPassengerCoords] = useState<[number, number]>([6.9271, 79.8612]);
+  // Passenger Live Pickup Location
+  const [passengerCoords] = useState<[number, number]>([6.9271, 79.8612]);
 
-  // Fetch Live Suggestions for Autocomplete
+  // Fetch Live Suggestions
   const fetchSuggestions = async (
     query: string,
     setFn: (suggestions: Suggestion[]) => void
@@ -138,41 +140,36 @@ export default function GalaxyRides3D() {
     }
   };
 
-  // Handle Start Location Input Change
   const handleStartInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setStartQuery(val);
     fetchSuggestions(val, setStartSuggestions);
   };
 
-  // Handle End Location Input Change
   const handleEndInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setEndQuery(val);
     fetchSuggestions(val, setEndSuggestions);
   };
 
-  // Select Suggestion for Start
   const selectStartSuggestion = (s: Suggestion) => {
     const coords: [number, number] = [parseFloat(s.lat), parseFloat(s.lon)];
     setStartQuery(s.display_name.split(",").slice(0, 3).join(","));
     setStartCoords(coords);
     setStartSuggestions([]);
     setMapCenter(coords);
-    setMapZoom(16); // Zoom close
+    setMapZoom(16);
   };
 
-  // Select Suggestion for End
   const selectEndSuggestion = (s: Suggestion) => {
     const coords: [number, number] = [parseFloat(s.lat), parseFloat(s.lon)];
     setEndQuery(s.display_name.split(",").slice(0, 3).join(","));
     setEndCoords(coords);
     setEndSuggestions([]);
     setMapCenter(coords);
-    setMapZoom(16); // Zoom close
+    setMapZoom(16);
   };
 
-  // Fetch OSRM Real Road Route
   const fetchRealRoadRoute = async (start: [number, number], end: [number, number]) => {
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
@@ -366,7 +363,7 @@ export default function GalaxyRides3D() {
           <div style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
             <h3 style={{ color: "#38bdf8", marginTop: "0" }}>🚗 Driver Panel & Route Setup</h3>
 
-            {/* Start Location Input with Autocomplete */}
+            {/* Start Location Input */}
             <div style={{ marginBottom: "16px", position: "relative" }}>
               <label style={{ display: "block", fontSize: "0.85rem", color: "#cbd5e1", marginBottom: "4px" }}>
                 📍 Start Location (e.g. Jaffna Bus Stand)
@@ -393,7 +390,7 @@ export default function GalaxyRides3D() {
               )}
             </div>
 
-            {/* End Location Input with Autocomplete */}
+            {/* End Location Input */}
             <div style={{ marginBottom: "16px", position: "relative" }}>
               <label style={{ display: "block", fontSize: "0.85rem", color: "#cbd5e1", marginBottom: "4px" }}>
                 🏁 Destination Location (e.g. Nuwara Dalada Maligawa)
@@ -458,7 +455,7 @@ export default function GalaxyRides3D() {
           {/* Interactive Live Map */}
           <div style={{ height: "520px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
             <MapContainer center={mapCenter} zoom={mapZoom} style={{ height: "100%", width: "100%" }}>
-              <MapController center={mapCenter} zoom={mapZoom} />
+              <MapFlyTo center={mapCenter} zoom={mapZoom} />
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
               <Marker position={startCoords}>
@@ -473,11 +470,11 @@ export default function GalaxyRides3D() {
                 <Polyline positions={roadRoute} color="#0284c7" weight={5} />
               )}
 
-              {/* Display Booked Passenger Live Location (PickMe Style) */}
+              {/* Display Booked Passenger Live Pickup Location */}
               {ridePosts.find((r) => r.bookedBy) && (
                 <Marker position={ridePosts.find((r) => r.bookedBy)!.bookedBy!.passengerCoords}>
                   <Popup>
-                    🙋‍♂️️ <b>Passenger PickUp Location</b>
+                    🙋‍♂️ <b>Passenger PickUp Location</b>
                     <br />
                     Name: {ridePosts.find((r) => r.bookedBy)!.bookedBy!.passengerName}
                     <br />
@@ -538,17 +535,16 @@ export default function GalaxyRides3D() {
                       <b>Route:</b> {ride.startName} ➔ {ride.endName} ({ride.distanceKm})
                     </p>
 
-                    {/* PickMe Live Tracking Map View */}
+                    {/* PickMe Dynamic Live Tracking Map */}
                     <div style={{ height: "300px", borderRadius: "8px", overflow: "hidden", marginTop: "14px" }}>
                       <MapContainer
                         center={ride.bookedBy ? ride.startCoords : ride.startCoords}
                         zoom={ride.bookedBy ? 14 : 10}
                         style={{ height: "100%", width: "100%" }}
                       >
-                        <MapController center={ride.startCoords} zoom={ride.bookedBy ? 14 : 10} />
+                        <MapFlyTo center={ride.startCoords} zoom={ride.bookedBy ? 14 : 10} />
                         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                        
-                        {/* Driver Location */}
+
                         <Marker position={ride.startCoords}>
                           <Popup>🚗 <b>Driver Location</b> ({ride.driverName})</Popup>
                         </Marker>
@@ -557,7 +553,6 @@ export default function GalaxyRides3D() {
                           <Popup>🔴 Destination</Popup>
                         </Marker>
 
-                        {/* Passenger Location when Booked */}
                         {ride.bookedBy && (
                           <Marker position={ride.bookedBy.passengerCoords}>
                             <Popup>🙋‍♂️ <b>Your Pickup Location</b></Popup>
