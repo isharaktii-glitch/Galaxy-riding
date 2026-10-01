@@ -70,10 +70,12 @@ export default function GalaxyRides3D() {
   const [lang, setLang] = useState<Language>("si");
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [authMode, setAuthMode] = useState<"login" | "register">("register");
+  
+  // Auth Mode: Login or Register
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [currentTab, setCurrentTab] = useState<"dashboard" | "kyc">("dashboard");
 
-  // Registration States
+  // Auth Inputs
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -152,28 +154,48 @@ export default function GalaxyRides3D() {
   // Password Validation
   const handlePasswordChange = (val: string) => {
     setPassword(val);
-    const strongRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})");
-    if (!strongRegex.test(val)) {
-      setPassError("අවම අකුරු 8ක්, Capital/Simple, අංකයක් සහ විශේෂ ලකුණක් (!@#$%^&*) ඇතුළත් කරන්න.");
+    if (authMode === "register") {
+      const strongRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})");
+      if (!strongRegex.test(val)) {
+        setPassError("අවම අකුරු 8ක්, Capital/Simple, අංකයක් සහ විශේෂ ලකුණක් (!@#$%^&*) ඇතුළත් කරන්න.");
+      } else {
+        setPassError("");
+      }
     } else {
       setPassError("");
     }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  // Auth Submit Handle (Register or Login)
+  const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passError) return;
+    if (authMode === "register" && passError) return;
 
-    const user: User = {
-      id: "USR-" + Date.now().toString().slice(-4),
-      name: fullName,
-      username,
-      email,
-      phone,
-      role: "passenger",
-      isVerifiedDriver: false,
-    };
-    setCurrentUser(user);
+    if (authMode === "login") {
+      // Demo Login Logic
+      const user: User = {
+        id: "USR-1001",
+        name: username || "Ishara Driver",
+        username: username || "ishara",
+        email: email || "user@galaxy.com",
+        phone: "0771234567",
+        role: "passenger",
+        isVerifiedDriver: false,
+      };
+      setCurrentUser(user);
+    } else {
+      // Register Logic
+      const user: User = {
+        id: "USR-" + Date.now().toString().slice(-4),
+        name: fullName,
+        username,
+        email,
+        phone,
+        role: "passenger",
+        isVerifiedDriver: false,
+      };
+      setCurrentUser(user);
+    }
     setCurrentTab("dashboard");
   };
 
@@ -299,32 +321,93 @@ export default function GalaxyRides3D() {
       </div>
 
       {!currentUser ? (
-        /* Login / Register */
+        /* LOGIN / REGISTER FORM WITH TOGGLE */
         <div style={centerFlex}>
           <div style={cardStyle}>
-            <h3 style={{ color: "#38bdf8", textAlign: "center", marginTop: 0 }}>
-              {authMode === "register" ? "📝 නව ගිණුමක් අරඹන්න" : "🔑 ඇතුළු වන්න"}
-            </h3>
+            {/* Form Mode Selector Header */}
+            <div style={{ display: "flex", borderBottom: "2px solid #334155", marginBottom: "15px" }}>
+              <button
+                type="button"
+                onClick={() => setAuthMode("login")}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: authMode === "login" ? "3px solid #38bdf8" : "none",
+                  color: authMode === "login" ? "#38bdf8" : "#94a3b8",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  fontSize: "1rem"
+                }}
+              >
+                🔑 Login
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMode("register")}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: authMode === "register" ? "3px solid #38bdf8" : "none",
+                  color: authMode === "register" ? "#38bdf8" : "#94a3b8",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  fontSize: "1rem"
+                }}
+              >
+                📝 Register
+              </button>
+            </div>
 
-            <form onSubmit={handleRegister} style={formStyle}>
-              {authMode === "register" && (
+            <form onSubmit={handleAuthSubmit} style={formStyle}>
+              {authMode === "register" ? (
                 <>
                   <input type="text" placeholder="සම්පූර්ණ නම" value={fullName} onChange={(e) => setFullName(e.target.value)} required style={inputStyle} />
                   <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required style={inputStyle} />
                   <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required style={inputStyle} />
-                  <input type="text" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} required style={inputStyle} />
+                  <input type="text" placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} required style={inputStyle} />
+                </>
+              ) : (
+                <>
+                  <input type="text" placeholder="Username / Email" value={username} onChange={(e) => setUsername(e.target.value)} required style={inputStyle} />
                 </>
               )}
+
               <div>
                 <input type="password" placeholder="Password" value={password} onChange={(e) => handlePasswordChange(e.target.value)} required style={inputStyle} />
                 {passError && <span style={{ color: "#ef4444", fontSize: "0.75rem", display: "block", marginTop: "4px" }}>{passError}</span>}
               </div>
-              <button type="submit" style={primaryBtn}>{authMode === "register" ? "Register" : "Login"}</button>
+
+              <button type="submit" style={primaryBtn}>
+                {authMode === "login" ? "ඇතුළු වන්න (Login)" : "ලියාපදිංචි වන්න (Register)"}
+              </button>
             </form>
+
+            {/* Bottom Toggle Link */}
+            <div style={{ textAlign: "center", marginTop: "15px", fontSize: "0.85rem", color: "#94a3b8" }}>
+              {authMode === "login" ? (
+                <span>
+                  තවම ගිණුමක් නැතිද?{" "}
+                  <button onClick={() => setAuthMode("register")} style={{ color: "#38bdf8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                    මෙතැනින් Register වන්න
+                  </button>
+                </span>
+              ) : (
+                <span>
+                  දැනටමත් ගිණුමක් තිබේද?{" "}
+                  <button onClick={() => setAuthMode("login")} style={{ color: "#38bdf8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                    මෙතැනින් Login වන්න
+                  </button>
+                </span>
+              )}
+            </div>
           </div>
         </div>
       ) : (
-        /* Dashboard & Routing UI */
+        /* DASHBOARD & RIDE PUBLISHER */
         <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
           <div style={{ ...cardStyle, marginBottom: "15px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
@@ -337,7 +420,7 @@ export default function GalaxyRides3D() {
           </div>
 
           {currentTab === "kyc" ? (
-            /* KYC Verification Form */
+            /* KYC Form */
             <div style={{ ...cardStyle, maxWidth: "550px", margin: "0 auto" }}>
               <button onClick={() => setCurrentTab("dashboard")} style={{ background: "transparent", color: "#38bdf8", border: "none", cursor: "pointer", marginBottom: "10px" }}>⬅️ Back to Dashboard</button>
               <h3 style={{ color: "#38bdf8", marginTop: 0 }}>🪪 Driver ID & Live Face Verification</h3>
@@ -473,7 +556,7 @@ export default function GalaxyRides3D() {
 
 // Styling Constants
 const centerFlex = { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "75vh" };
-const cardStyle = { background: "#1e293b", padding: "20px", borderRadius: "16px", border: "1px solid #334155", width: "100%", boxSizing: "border-box" as const };
+const cardStyle = { background: "#1e293b", padding: "20px", borderRadius: "16px", border: "1px solid #334155", width: "100%", maxWidth: "450px", boxSizing: "border-box" as const };
 const formStyle = { display: "flex", flexDirection: "column" as const, gap: "10px" };
 const inputStyle = { width: "100%", padding: "10px", borderRadius: "6px", background: "#0f172a", color: "#fff", border: "1px solid #475569", boxSizing: "border-box" as const };
 const labelStyle = { fontSize: "0.8rem", color: "#cbd5e1", display: "block", marginBottom: "4px" };
