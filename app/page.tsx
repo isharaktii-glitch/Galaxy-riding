@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 
-// Leaflet Components Dynamic Import (SSR bypass)
+// Leaflet Dynamic Imports (SSR Bypass)
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   { ssr: false }
@@ -13,21 +13,9 @@ const TileLayer = dynamic(
   { ssr: false }
 );
 const Marker = dynamic(
-  () => import("reactඔබ ලබාදුන් කරුණු 2 ම සම්පූර්ණයෙන්ම විසඳා ඇත:
+  () => import("react-leafletකලින් පිළිතුරෙහි සිංහල පැහැදිලි කිරීම් Code Block එක ඇතුළත එකතු වීම නිසා TSX syntax error එකක් පැමිණ ඇත. 
 
-1. **ලියාපදිංචිය / Login System එක:**
-   - ඍජුවම Dashboard එකට නොගොස් මුලින්ම **Role Selection (Driver / Passenger)** සහ **Login / Register View** එකක් එකතු කර ඇත.
-   - User Account එකක් සාදා (නම, Phone Number, Password, Role) Login වූ පසු පමණක් අදාළ Dashboard එක (Driver Control Panel හෝ Passenger Search Interface) open වේ.
-
-2. **Google Maps වැනි සැබෑ පාරවල් (Real OSRM Road Routing):**
-   - තනි කෙලින් ඉර (Straight line) වෙනුවට **OSRM Routing Engine API** එක Integrates කර ඇත.
-   - Start සහ Ending locations දුන් පසු හෝ Map එකේ Markers Drag කළ පසු, **සැබෑ මාර්ගය ඔස්සේ (Real Roads & Turn-by-Turn Path)** Blue Line එක Automatic Draw වේ. Distance (km) සහ Duration (mins) ද ගණනය වේ.
-
----
-
-### 🚀 Update කරන ලද සම්පූර්ණ Code එක (`app/page.tsx`):
-
-පහත Code එක සම්පූර්ණයෙන්ම කොපි කර ඔබගේ `app/page.tsx` File එකට Replace කරන්න:
+පහත දක්වා ඇති **නිවැරදි කරන ලද සම්පූර්ණ Code එක** පමණක් `app/page.tsx` File එකට Copy-Paste කර Build එකක් ලබා දෙන්න:
 
 ```tsx
 "use client";
@@ -59,7 +47,7 @@ const Polyline = dynamic(
 
 import "leaflet/dist/leaflet.css";
 
-// Models
+// Interfaces
 interface User {
   name: string;
   phone: string;
@@ -123,7 +111,6 @@ export default function GalaxyRides3D() {
 
       if (data.routes && data.routes.length > 0) {
         const coordinates = data.routes[0].geometry.coordinates;
-        // Convert OSRM [lon, lat] to Leaflet [lat, lon]
         const leafletCoords: [number, number][] = coordinates.map(
           (coord: [number, number]) => [coord[1], coord[0]]
         );
@@ -134,7 +121,7 @@ export default function GalaxyRides3D() {
       }
     } catch (err) {
       console.error("OSRM Route Fetch Error:", err);
-      setRoadRoute([start, end]); // Fallback
+      setRoadRoute([start, end]);
     }
   };
 
