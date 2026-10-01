@@ -24,23 +24,29 @@ const Polyline = dynamic(
   { ssr: false }
 );
 
-// Map FlyTo Controller Component
+// Map FlyToBounds / FlyTo Controller Component
 const MapFlyTo = dynamic(
   () =>
     import("react-leaflet").then((mod) => {
       const Component = ({
+        bounds,
         center,
         zoom,
       }: {
-        center: [number, number];
-        zoom: number;
+        bounds?: [[number, number], [number, number]];
+        center?: [number, number];
+        zoom?: number;
       }) => {
         const map = mod.useMap();
         useEffect(() => {
-          if (map && center) {
-            map.flyTo(center, zoom, { animate: true, duration: 1.5 });
+          if (map) {
+            if (bounds && bounds[0][0] !== bounds[1][0]) {
+              map.flyToBounds(bounds, { padding: [50, 50], duration: 1.5 });
+            } else if (center && zoom) {
+              map.flyTo(center, zoom, { animate: true, duration: 1.5 });
+            }
           }
-        }, [center, zoom, map]);
+        }, [bounds, center, zoom, map]);
         return null;
       };
       return Component;
@@ -49,6 +55,26 @@ const MapFlyTo = dynamic(
 );
 
 import "leaflet/dist/leaflet.css";
+
+// Custom Leaflet Icons Fix
+import L from "leaflet";
+const greenIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+const redIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
 
 interface User {
   name: string;
@@ -97,17 +123,19 @@ export default function GalaxyRides3D() {
   const [seats, setSeats] = useState(3);
   const [isLadiesOnly, setIsLadiesOnly] = useState(false);
 
-  // Locations & Coordinates
-  const [startQuery, setStartQuery] = useState("Colombo Fort");
-  const [startCoords, setStartCoords] = useState<[number, number]>([6.9344, 79.8428]);
+  // Locations & Coordinates (Default Jaffna to Kandy example)
+  const [startQuery, setStartQuery] = useState("Jaffna Bus Stand");
+  const [startCoords, setStartCoords] = useState<[number, number]>([9.6643, 80.0168]);
   const [startSuggestions, setStartSuggestions] = useState<Suggestion[]>([]);
 
-  const [endQuery, setEndQuery] = useState("Kandy Temple of the Tooth");
+  const [endQuery, setEndQuery] = useState("Nuwara Dalada Maligawa, Kandy");
   const [endCoords, setEndCoords] = useState<[number, number]>([7.2936, 80.6413]);
   const [endSuggestions, setEndSuggestions] = useState<Suggestion[]>([]);
 
-  const [mapCenter, setMapCenter] = useState<[number, number]>([6.9344, 79.8428]);
-  const [mapZoom, setMapZoom] = useState<number>(12);
+  const [mapBounds, setMapBounds] = useState<[[number, number], [number, number]]>([
+    [9.6643, 80.0168],
+    [7.2936, 80.6413],
+  ]);
 
   const [roadRoute, setRoadRoute] = useState<[number, number][]>([]);
   const [routeDistance, setRouteDistance] = useState<string>("");
@@ -115,10 +143,10 @@ export default function GalaxyRides3D() {
   const [ridePosts, setRidePosts] = useState<RidePost[]>([]);
   const [searchDestination, setSearchDestination] = useState("");
 
-  // Passenger Live Pickup Location
+  // Passenger Live Location
   const [passengerCoords, setPassengerCoords] = useState<[number, number]>([6.9271, 79.8612]);
 
-  // Fetch Live Suggestions for Autocomplete
+  // Fetch Suggestions
   const fetchSuggestions = async (
     query: string,
     setFn: (suggestions: Suggestion[]) => void
@@ -157,8 +185,7 @@ export default function GalaxyRides3D() {
     setStartQuery(s.display_name.split(",").slice(0, 3).join(","));
     setStartCoords(coords);
     setStartSuggestions([]);
-    setMapCenter(coords);
-    setMapZoom(15);
+    updateRouteAndBounds(coords, endCoords);
   };
 
   const selectEndSuggestion = (s: Suggestion) => {
@@ -166,11 +193,18 @@ export default function GalaxyRides3D() {
     setEndQuery(s.display_name.split(",").slice(0, 3).join(","));
     setEndCoords(coords);
     setEndSuggestions([]);
-    setMapCenter(coords);
-    setMapZoom(15);
+    updateRouteAndBounds(startCoords, coords);
   };
 
-  // Get Current GPS Location
+  // Trigger Fly to Full Route manually
+  const handleFlyToRoute = () => {
+    setMapBounds([
+      [Math.min(startCoords[0], endCoords[0]), Math.min(startCoords[1], endCoords[1])],
+      [Math.max(startCoords[0], endCoords[0]), Math.max(startCoords[1], endCoords[1])],
+    ]);
+  };
+
+  // Get GPS Current Location
   const handleFindMyLocation = (isPassengerMode = false) => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -181,26 +215,23 @@ export default function GalaxyRides3D() {
 
           if (isPassengerMode) {
             setPassengerCoords(coords);
-            alert("📍 Your current GPS location detected!");
+            alert("📍 Passenger GPS location set!");
           } else {
             setStartCoords(coords);
             setStartQuery("My Current GPS Location");
-            setMapCenter(coords);
-            setMapZoom(16);
+            updateRouteAndBounds(coords, endCoords);
           }
         },
         (error) => {
-          alert("Unable to fetch location. Please allow browser location access.");
+          alert("Please allow browser GPS location access.");
           console.error(error);
         }
       );
-    } else {
-      alert("Geolocation is not supported by your browser.");
     }
   };
 
-  // Fetch OSRM Real Road Route
-  const fetchRealRoadRoute = async (start: [number, number], end: [number, number]) => {
+  // Fetch OSRM Real Driving Route Path
+  const updateRouteAndBounds = async (start: [number, number], end: [number, number]) => {
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
       const res = await fetch(url);
@@ -215,6 +246,12 @@ export default function GalaxyRides3D() {
 
         const distInKm = (data.routes[0].distance / 1000).toFixed(1);
         setRouteDistance(`${distInKm} km`);
+
+        // Fit Bounds to cover full road path
+        setMapBounds([
+          [Math.min(start[0], end[0]), Math.min(start[1], end[1])],
+          [Math.max(start[0], end[0]), Math.max(start[1], end[1])],
+        ]);
       } else {
         setRoadRoute([start, end]);
       }
@@ -225,8 +262,8 @@ export default function GalaxyRides3D() {
   };
 
   useEffect(() => {
-    fetchRealRoadRoute(startCoords, endCoords);
-  }, [startCoords, endCoords]);
+    updateRouteAndBounds(startCoords, endCoords);
+  }, []);
 
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,7 +298,7 @@ export default function GalaxyRides3D() {
     };
 
     setRidePosts([newRide, ...ridePosts]);
-    alert("🚀 Ride published live on Galaxy Rides!");
+    alert("🚀 Ride Route Published Successfully!");
   };
 
   const handleBookRide = (rideId: string) => {
@@ -394,19 +431,19 @@ export default function GalaxyRides3D() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", maxWidth: "1200px", margin: "0 auto" }}>
           <div style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <h3 style={{ color: "#38bdf8", margin: 0 }}>🚗 Driver Panel & Route Setup</h3>
+              <h3 style={{ color: "#38bdf8", margin: 0 }}>🚗 Driver Route Setup</h3>
               <button
                 onClick={() => handleFindMyLocation(false)}
                 style={{ padding: "6px 12px", background: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem", fontWeight: "bold" }}
               >
-                🎯 Find My Location
+                🎯 GPS Location
               </button>
             </div>
 
-            {/* Start Location Input */}
+            {/* Start Location Input with Auto-Suggestions */}
             <div style={{ marginBottom: "16px", position: "relative" }}>
               <label style={{ display: "block", fontSize: "0.85rem", color: "#cbd5e1", marginBottom: "4px" }}>
-                📍 Start Location (e.g. Jaffna Bus Stand)
+                📍 Start Location (Type e.g. Jaffna Bus Stand)
               </label>
               <input
                 type="text"
@@ -430,10 +467,10 @@ export default function GalaxyRides3D() {
               )}
             </div>
 
-            {/* End Location Input */}
+            {/* End Location Input with Auto-Suggestions */}
             <div style={{ marginBottom: "16px", position: "relative" }}>
               <label style={{ display: "block", fontSize: "0.85rem", color: "#cbd5e1", marginBottom: "4px" }}>
-                🏁 Destination Location (e.g. Nuwara Dalada Maligawa)
+                🏁 Destination (Type e.g. Nuwara Dalada Maligawa)
               </label>
               <input
                 type="text"
@@ -457,9 +494,17 @@ export default function GalaxyRides3D() {
               )}
             </div>
 
+            {/* Fly to Route Dedicated Button */}
+            <button
+              onClick={handleFlyToRoute}
+              style={{ width: "100%", padding: "10px", background: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginBottom: "12px" }}
+            >
+              🚀 Fly to Route (Show Full Path)
+            </button>
+
             {routeDistance && (
               <div style={{ background: "#0f172a", padding: "10px", borderRadius: "8px", border: "1px solid #0284c7", marginBottom: "12px", color: "#38bdf8" }}>
-                🗺️ Calculated Road Distance: <b>{routeDistance}</b>
+                🗺️ Total Road Distance: <b>{routeDistance}</b>
               </div>
             )}
 
@@ -492,36 +537,23 @@ export default function GalaxyRides3D() {
             </button>
           </div>
 
-          {/* Interactive Live Map */}
+          {/* Dynamic Interactive Map */}
           <div style={{ height: "520px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
-            <MapContainer center={mapCenter} zoom={mapZoom} style={{ height: "100%", width: "100%" }}>
-              <MapFlyTo center={mapCenter} zoom={mapZoom} />
+            <MapContainer bounds={mapBounds} style={{ height: "100%", width: "100%" }}>
+              <MapFlyTo bounds={mapBounds} />
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-              <Marker position={startCoords}>
+              <Marker position={startCoords} icon={greenIcon}>
                 <Popup>🟢 Start: {startQuery}</Popup>
               </Marker>
 
-              <Marker position={endCoords}>
+              <Marker position={endCoords} icon={redIcon}>
                 <Popup>🔴 Destination: {endQuery}</Popup>
               </Marker>
 
-              {/* Road Path Highlight Line */}
+              {/* Driving Road Route Highlight Line */}
               {roadRoute.length > 0 && (
-                <Polyline positions={roadRoute} pathOptions={{ color: "#0284c7", weight: 6, opacity: 0.8 }} />
-              )}
-
-              {/* Display Booked Passenger Live Pickup Location */}
-              {ridePosts.find((r) => r.bookedBy) && (
-                <Marker position={ridePosts.find((r) => r.bookedBy)!.bookedBy!.passengerCoords}>
-                  <Popup>
-                    🙋‍♂️ <b>Passenger PickUp Location</b>
-                    <br />
-                    Name: {ridePosts.find((r) => r.bookedBy)!.bookedBy!.passengerName}
-                    <br />
-                    Phone: {ridePosts.find((r) => r.bookedBy)!.bookedBy!.passengerPhone}
-                  </Popup>
-                </Marker>
+                <Polyline positions={roadRoute} pathOptions={{ color: "#2563eb", weight: 6, opacity: 0.85 }} />
               )}
             </MapContainer>
           </div>
@@ -533,17 +565,17 @@ export default function GalaxyRides3D() {
         <div style={{ maxWidth: "950px", margin: "0 auto" }}>
           <div style={{ background: "#1e293b", padding: "16px", borderRadius: "12px", marginBottom: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-              <h3 style={{ color: "#38bdf8", margin: 0 }}>🔍 Find & Track Your Ride</h3>
+              <h3 style={{ color: "#38bdf8", margin: 0 }}>🔍 Search Available Rides</h3>
               <button
                 onClick={() => handleFindMyLocation(true)}
                 style={{ padding: "6px 12px", background: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem", fontWeight: "bold" }}
               >
-                🎯 Set My Live GPS Location
+                🎯 Set My Pickup Location
               </button>
             </div>
             <input
               type="text"
-              placeholder="Search destination (e.g. Kandy, Dalada Maligawa)"
+              placeholder="Search destination (e.g. Kandy, Nuwara Dalada Maligawa)"
               value={searchDestination}
               onChange={(e) => setSearchDestination(e.target.value)}
               style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #475569", background: "#0f172a", color: "#fff" }}
@@ -552,67 +584,71 @@ export default function GalaxyRides3D() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {ridePosts.length === 0 ? (
-              <p style={{ textAlign: "center", color: "#94a3b8" }}>No published rides available yet.</p>
+              <p style={{ textAlign: "center", color: "#94a3b8" }}>No published rides available. Switch to Driver and publish one!</p>
             ) : (
               ridePosts
                 .filter((r) => r.endName.toLowerCase().includes(searchDestination.toLowerCase()))
-                .map((ride) => (
-                  <div key={ride.id} style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <h4 style={{ margin: "0", color: "#38bdf8", fontSize: "1.1rem" }}>{ride.driverName} ({ride.vehicle})</h4>
-                        <p style={{ margin: "4px 0", color: "#94a3b8", fontSize: "0.85rem" }}>📞 Phone: {ride.driverPhone}</p>
+                .map((ride) => {
+                  const fitBounds: [[number, number], [number, number]] = [
+                    [Math.min(ride.startCoords[0], ride.endCoords[0]), Math.min(ride.startCoords[1], ride.endCoords[1])],
+                    [Math.max(ride.startCoords[0], ride.endCoords[0]), Math.max(ride.startCoords[1], ride.endCoords[1])],
+                  ];
+
+                  return (
+                    <div key={ride.id} style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <h4 style={{ margin: "0", color: "#38bdf8", fontSize: "1.1rem" }}>{ride.driverName} ({ride.vehicle})</h4>
+                          <p style={{ margin: "4px 0", color: "#94a3b8", fontSize: "0.85rem" }}>📞 Phone: {ride.driverPhone}</p>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: "1.3rem", fontWeight: "bold", color: "#4ade80", marginRight: "12px" }}>LKR {ride.price}</span>
+                          {!ride.bookedBy ? (
+                            <button
+                              onClick={() => handleBookRide(ride.id)}
+                              style={{ padding: "8px 16px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}
+                            >
+                              🚕 Book Ride Now
+                            </button>
+                          ) : (
+                            <span style={{ background: "#0284c7", color: "#fff", padding: "6px 12px", borderRadius: "6px", fontSize: "0.85rem", fontWeight: "bold" }}>
+                              ✅ Booked & Live Tracking Active
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <span style={{ fontSize: "1.3rem", fontWeight: "bold", color: "#4ade80", marginRight: "12px" }}>LKR {ride.price}</span>
-                        {!ride.bookedBy ? (
-                          <button
-                            onClick={() => handleBookRide(ride.id)}
-                            style={{ padding: "8px 16px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}
-                          >
-                            🚕 Book Ride Now
-                          </button>
-                        ) : (
-                          <span style={{ background: "#0284c7", color: "#fff", padding: "6px 12px", borderRadius: "6px", fontSize: "0.85rem", fontWeight: "bold" }}>
-                            ✅ Booked & Live Tracking Active
-                          </span>
-                        )}
-                      </div>
-                    </div>
 
-                    <p style={{ margin: "12px 0 0 0", color: "#cbd5e1" }}>
-                      <b>Route:</b> {ride.startName} ➔ {ride.endName} ({ride.distanceKm})
-                    </p>
+                      <p style={{ margin: "12px 0 0 0", color: "#cbd5e1" }}>
+                        <b>Full Route:</b> {ride.startName} ➔ {ride.endName} ({ride.distanceKm})
+                      </p>
 
-                    {/* Live Road Route Map */}
-                    <div style={{ height: "300px", borderRadius: "8px", overflow: "hidden", marginTop: "14px" }}>
-                      <MapContainer
-                        center={ride.startCoords}
-                        zoom={ride.bookedBy ? 14 : 10}
-                        style={{ height: "100%", width: "100%" }}
-                      >
-                        <MapFlyTo center={ride.startCoords} zoom={ride.bookedBy ? 14 : 10} />
-                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      {/* Map Displaying Full Road Path to Passenger */}
+                      <div style={{ height: "320px", borderRadius: "8px", overflow: "hidden", marginTop: "14px" }}>
+                        <MapContainer bounds={fitBounds} style={{ height: "100%", width: "100%" }}>
+                          <MapFlyTo bounds={fitBounds} />
+                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-                        <Marker position={ride.startCoords}>
-                          <Popup>🚗 <b>Driver Location</b> ({ride.driverName})</Popup>
-                        </Marker>
-
-                        <Marker position={ride.endCoords}>
-                          <Popup>🔴 Destination</Popup>
-                        </Marker>
-
-                        {ride.bookedBy && (
-                          <Marker position={ride.bookedBy.passengerCoords}>
-                            <Popup>🙋‍♂️ <b>Your Pickup Location</b></Popup>
+                          <Marker position={ride.startCoords} icon={greenIcon}>
+                            <Popup>🚗 <b>Driver Location:</b> {ride.startName}</Popup>
                           </Marker>
-                        )}
 
-                        <Polyline positions={ride.routePolyline} pathOptions={{ color: "#0284c7", weight: 5, opacity: 0.8 }} />
-                      </MapContainer>
+                          <Marker position={ride.endCoords} icon={redIcon}>
+                            <Popup>🔴 <b>Destination:</b> {ride.endName}</Popup>
+                          </Marker>
+
+                          {ride.bookedBy && (
+                            <Marker position={ride.bookedBy.passengerCoords}>
+                              <Popup>🙋‍♂️ <b>Your Pickup Point</b></Popup>
+                            </Marker>
+                          )}
+
+                          {/* Full Road Polyline display */}
+                          <Polyline positions={ride.routePolyline} pathOptions={{ color: "#2563eb", weight: 6, opacity: 0.85 }} />
+                        </MapContainer>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
             )}
           </div>
         </div>
