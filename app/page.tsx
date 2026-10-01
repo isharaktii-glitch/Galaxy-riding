@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 
-// Safe Dynamic Imports for Leaflet (Prevents SSR Client-side Exceptions)
+// Dynamic Imports for Leaflet Map Components
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   { ssr: false }
@@ -22,6 +22,28 @@ const Popup = dynamic(
 );
 const Polyline = dynamic(
   () => import("react-leaflet").then((mod) => mod.Polyline),
+  { ssr: false }
+);
+const MapController = dynamic(
+  () =>
+    import("react-leaflet").then((mod) => {
+      const { useMap } = mod;
+      return function Controller({
+        start,
+        end,
+      }: {
+        start: [number, number];
+        end: [number, number];
+      }) {
+        const map = useMap();
+        useEffect(() => {
+          if (map && start && end) {
+            map.fitBounds([start, end], { padding: [50, 50] });
+          }
+        }, [map, start, end]);
+        return null;
+      };
+    }),
   { ssr: false }
 );
 
@@ -62,7 +84,6 @@ interface RidePost {
   routePolyline: [number, number][];
   distanceKm: string;
   durationMins: string;
-  routeType: "normal" | "shortest" | "ai_fastest";
   status: "active" | "finished";
 }
 
@@ -71,11 +92,11 @@ export default function GalaxyRides3D() {
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Auth States (Login vs Register)
+  // Auth States
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
   const [currentTab, setCurrentTab] = useState<"dashboard" | "kyc">("dashboard");
 
-  // Registration & User Inputs
+  // User Inputs
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -84,7 +105,7 @@ export default function GalaxyRides3D() {
   const [selectedRole, setSelectedRole] = useState<"passenger" | "driver">("driver");
   const [passError, setPassError] = useState("");
 
-  // Driver KYC & Camera Verification States
+  // Driver KYC States
   const [nicNumber, setNicNumber] = useState("");
   const [idPhotoUrl, setIdPhotoUrl] = useState("");
   const [liveFacePhoto, setLiveFacePhoto] = useState<string | null>(null);
@@ -93,24 +114,25 @@ export default function GalaxyRides3D() {
   const [isAiVerifying, setIsAiVerifying] = useState(false);
   const [aiMatchStatus, setAiMatchStatus] = useState("");
 
-  // Video and Canvas Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Map, Route & AI Route Cut States
+  // Map & Location States (Defaults: Colombo Fort & Embilipitiya)
   const [vehicle, setVehicle] = useState("Toyota Prius Hybrid");
   const [price, setPrice] = useState(1200);
+
   const [startQuery, setStartQuery] = useState("Colombo Fort");
   const [startCoords, setStartCoords] = useState<[number, number]>([6.9344, 79.8428]);
-  const [endQuery, setEndQuery] = useState("Kandy Clock Tower");
-  const [endCoords, setEndCoords] = useState<[number, number]>([7.2906, 80.6337]);
+
+  const [endQuery, setEndQuery] = useState("Embilipitiya");
+  const [endCoords, setEndCoords] = useState<[number, number]>([6.3385, 80.8492]);
+
   const [startSuggestions, setStartSuggestions] = useState<Suggestion[]>([]);
   const [endSuggestions, setEndSuggestions] = useState<Suggestion[]>([]);
 
   const [roadRoute, setRoadRoute] = useState<[number, number][]>([]);
-  const [routeDistance, setRouteDistance] = useState<string>("115 km");
-  const [routeDuration, setRouteDuration] = useState<string>("3 hrs 10 mins");
-  const [selectedRouteType, setSelectedRouteType] = useState<"normal" | "shortest" | "ai_fastest">("normal");
+  const [routeDistance, setRouteDistance] = useState<string>("");
+  const [routeDuration, setRouteDuration] = useState<string>("");
 
   const [ridePosts, setRidePosts] = useState<RidePost[]>([]);
 
@@ -124,7 +146,7 @@ export default function GalaxyRides3D() {
     }
   }, []);
 
-  // Fetch Road Polyline (OSRM Routing API)
+  // OSRM Real Driving Route Fetcher
   const fetchRoadRoute = async (start: [number, number], end: [number, number]) => {
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
@@ -139,6 +161,8 @@ export default function GalaxyRides3D() {
         setRoadRoute(coordinates);
         setRouteDistance((routeData.distance / 1000).toFixed(1) + " km");
         setRouteDuration((routeData.duration / 60).toFixed(0) + " mins");
+      } else {
+        setRoadRoute([start, end]);
       }
     } catch (e) {
       console.error("Routing Error:", e);
@@ -147,12 +171,27 @@ export default function GalaxyRides3D() {
   };
 
   useEffect(() => {
-    if (isClient) {
+    if (isClient && startCoords && endCoords) {
       fetchRoadRoute(startCoords, endCoords);
     }
   }, [startCoords, endCoords, isClient]);
 
-  // Strong Password Validation Rule
+  // Enhanced Suggestions Search for Entire Sri Lanka
+  const fetchSuggestions = async (query: string, setFn: (data: Suggestion[]) => void) => {
+    if (query.trim().length < 2) return setFn([]);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        query
+      )}&countrycodes=lk&limit=8`;
+      const res = await fetch(url);
+      const data = await res.json();
+      setFn(data || []);
+    } catch (e) {
+      console.error("Suggestion Error:", e);
+    }
+  };
+
+  // Password Validator
   const handlePasswordChange = (val: string) => {
     setPassword(val);
     if (authMode === "register") {
@@ -167,38 +206,24 @@ export default function GalaxyRides3D() {
     }
   };
 
-  // Auth Action Handler
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (authMode === "register" && passError) return;
 
-    if (authMode === "login") {
-      const user: User = {
-        id: "USR-1001",
-        name: username || "Driver / Passenger",
-        username: username || "user123",
-        email: email || "user@galaxy.com",
-        phone: "0771234567",
-        role: selectedRole,
-        isVerifiedDriver: false,
-      };
-      setCurrentUser(user);
-    } else {
-      const user: User = {
-        id: "USR-" + Date.now().toString().slice(-4),
-        name: fullName,
-        username,
-        email,
-        phone,
-        role: selectedRole,
-        isVerifiedDriver: false,
-      };
-      setCurrentUser(user);
-    }
+    const user: User = {
+      id: "USR-" + Date.now().toString().slice(-4),
+      name: authMode === "login" ? username || "User" : fullName,
+      username,
+      email,
+      phone: phone || "0771234567",
+      role: selectedRole,
+      isVerifiedDriver: false,
+    };
+    setCurrentUser(user);
     setCurrentTab("dashboard");
   };
 
-  // Camera Activation
+  // Camera Functions
   const startLiveCamera = async () => {
     setIsCameraActive(true);
     try {
@@ -254,18 +279,6 @@ export default function GalaxyRides3D() {
     }, 2500);
   };
 
-  const fetchSuggestions = async (query: string, setFn: (data: Suggestion[]) => void) => {
-    if (query.trim().length < 2) return setFn([]);
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ", Sri Lanka")}&limit=5`);
-      const data = await res.json();
-      setFn(data || []);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  // Publish Ride (Verified or Unverified drivers can publish)
   const handlePublishRide = () => {
     if (!currentUser) return;
     const newRide: RidePost = {
@@ -283,7 +296,6 @@ export default function GalaxyRides3D() {
       routePolyline: roadRoute,
       distanceKm: routeDistance,
       durationMins: routeDuration,
-      routeType: selectedRouteType,
       status: "active",
     };
     setRidePosts([newRide, ...ridePosts]);
@@ -320,10 +332,9 @@ export default function GalaxyRides3D() {
       </div>
 
       {!currentUser ? (
-        /* LOGIN & REGISTER AUTH CONTAINER WITH ROLE SELECTION */
+        /* LOGIN & REGISTER CONTAINER */
         <div style={centerFlex}>
           <div style={cardStyle}>
-            {/* Mode Switcher Tabs */}
             <div style={{ display: "flex", borderBottom: "2px solid #334155", marginBottom: "15px" }}>
               <button
                 type="button"
@@ -362,9 +373,8 @@ export default function GalaxyRides3D() {
             </div>
 
             <form onSubmit={handleAuthSubmit} style={formStyle}>
-              {/* Role Selection Option */}
               <div>
-                <label style={labelStyle}>ඔබ ලියාපදිංචි වන්නේ කෙසේද? (Select Role)</label>
+                <label style={labelStyle}>ඔබ ලියාපදිංචි වන්නේ කෙසේද?</label>
                 <div style={{ display: "flex", gap: "10px", marginBottom: "5px" }}>
                   <button
                     type="button"
@@ -409,9 +419,7 @@ export default function GalaxyRides3D() {
                   <input type="text" placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} required style={inputStyle} />
                 </>
               ) : (
-                <>
-                  <input type="text" placeholder="Username / Email" value={username} onChange={(e) => setUsername(e.target.value)} required style={inputStyle} />
-                </>
+                <input type="text" placeholder="Username / Email" value={username} onChange={(e) => setUsername(e.target.value)} required style={inputStyle} />
               )}
 
               <div>
@@ -423,28 +431,10 @@ export default function GalaxyRides3D() {
                 {authMode === "login" ? "ඇතුළු වන්න (Login)" : "ලියාපදිංචි වන්න (Register)"}
               </button>
             </form>
-
-            <div style={{ textAlign: "center", marginTop: "15px", fontSize: "0.85rem", color: "#94a3b8" }}>
-              {authMode === "login" ? (
-                <span>
-                  තවම ගිණුමක් නැතිද?{" "}
-                  <button onClick={() => setAuthMode("register")} style={{ color: "#38bdf8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
-                    මෙතැනින් Register වන්න
-                  </button>
-                </span>
-              ) : (
-                <span>
-                  දැනටමත් ගිණුමක් තිබේද?{" "}
-                  <button onClick={() => setAuthMode("login")} style={{ color: "#38bdf8", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
-                    මෙතැනින් Login වන්න
-                  </button>
-                </span>
-              )}
-            </div>
           </div>
         </div>
       ) : (
-        /* DASHBOARD, KYC & RIDE PUBLISHER WITH MAP */
+        /* DASHBOARD AND MAP VIEW */
         <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
           <div style={{ ...cardStyle, maxWidth: "100%", marginBottom: "15px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
@@ -467,7 +457,7 @@ export default function GalaxyRides3D() {
                 <input type="text" placeholder="ID Photo Link / URL" value={idPhotoUrl} onChange={(e) => setIdPhotoUrl(e.target.value)} required style={inputStyle} />
 
                 <div>
-                  <label style={labelStyle}>Live Camera Scan (Required)</label>
+                  <label style={labelStyle}>Live Camera Scan</label>
                   {!isCameraActive && !liveFacePhoto && (
                     <button type="button" onClick={startLiveCamera} style={{ ...primaryBtn, background: "#0284c7" }}>📷 Open Live Camera</button>
                   )}
@@ -496,13 +486,32 @@ export default function GalaxyRides3D() {
               <div style={{ ...cardStyle, maxWidth: "100%" }}>
                 <h3 style={{ color: "#38bdf8", marginTop: 0 }}>🚗 Ride Route Publisher</h3>
 
-                <div style={{ marginBottom: "10px" }}>
+                {/* Start Location Input */}
+                <div style={{ marginBottom: "10px", position: "relative" }}>
                   <label style={labelStyle}>Start Location</label>
-                  <input type="text" value={startQuery} onChange={(e) => { setStartQuery(e.target.value); fetchSuggestions(e.target.value, setStartSuggestions); }} style={inputStyle} />
+                  <input
+                    type="text"
+                    value={startQuery}
+                    onChange={(e) => {
+                      setStartQuery(e.target.value);
+                      fetchSuggestions(e.target.value, setStartSuggestions);
+                    }}
+                    placeholder="Search Sri Lanka Location..."
+                    style={inputStyle}
+                  />
                   {startSuggestions.length > 0 && (
                     <div style={suggestBox}>
                       {startSuggestions.map((s, idx) => (
-                        <div key={idx} onClick={() => { setStartCoords([parseFloat(s.lat), parseFloat(s.lon)]); setStartQuery(s.display_name); setStartSuggestions([]); }} style={suggestItem}>
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            const newCoords: [number, number] = [parseFloat(s.lat), parseFloat(s.lon)];
+                            setStartCoords(newCoords);
+                            setStartQuery(s.display_name);
+                            setStartSuggestions([]);
+                          }}
+                          style={suggestItem}
+                        >
                           📍 {s.display_name}
                         </div>
                       ))}
@@ -510,13 +519,32 @@ export default function GalaxyRides3D() {
                   )}
                 </div>
 
-                <div style={{ marginBottom: "10px" }}>
+                {/* End Destination Input */}
+                <div style={{ marginBottom: "10px", position: "relative" }}>
                   <label style={labelStyle}>End Destination</label>
-                  <input type="text" value={endQuery} onChange={(e) => { setEndQuery(e.target.value); fetchSuggestions(e.target.value, setEndSuggestions); }} style={inputStyle} />
+                  <input
+                    type="text"
+                    value={endQuery}
+                    onChange={(e) => {
+                      setEndQuery(e.target.value);
+                      fetchSuggestions(e.target.value, setEndSuggestions);
+                    }}
+                    placeholder="Search Sri Lanka Location..."
+                    style={inputStyle}
+                  />
                   {endSuggestions.length > 0 && (
                     <div style={suggestBox}>
                       {endSuggestions.map((s, idx) => (
-                        <div key={idx} onClick={() => { setEndCoords([parseFloat(s.lat), parseFloat(s.lon)]); setEndQuery(s.display_name); setEndSuggestions([]); }} style={suggestItem}>
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            const newCoords: [number, number] = [parseFloat(s.lat), parseFloat(s.lon)];
+                            setEndCoords(newCoords);
+                            setEndQuery(s.display_name);
+                            setEndSuggestions([]);
+                          }}
+                          style={suggestItem}
+                        >
                           🏁 {s.display_name}
                         </div>
                       ))}
@@ -524,24 +552,20 @@ export default function GalaxyRides3D() {
                   )}
                 </div>
 
-                {/* AI SHORTCUT & ROUTE TYPE SELECTION */}
-                <div style={{ marginBottom: "12px" }}>
-                  <label style={labelStyle}>🛣️ Select Route Type (AI Shortcut Engine)</label>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    <button type="button" onClick={() => setSelectedRouteType("normal")} style={routeTypeBtn(selectedRouteType === "normal", "#3b82f6")}>🔵 Normal</button>
-                    <button type="button" onClick={() => setSelectedRouteType("shortest")} style={routeTypeBtn(selectedRouteType === "shortest", "#22c55e")}>🟢 Shortest Cut</button>
-                    <button type="button" onClick={() => setSelectedRouteType("ai_fastest")} style={routeTypeBtn(selectedRouteType === "ai_fastest", "#a855f7")}>🟣 AI Smart Cut</button>
-                  </div>
-                </div>
-
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
                   <input type="text" value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="Vehicle Model" style={inputStyle} />
                   <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} placeholder="Price LKR" style={inputStyle} />
                 </div>
 
+                {routeDistance && routeDuration && (
+                  <div style={{ background: "#0f172a", padding: "8px 12px", borderRadius: "6px", marginBottom: "10px", border: "1px solid #334155", fontSize: "0.85rem", color: "#38bdf8" }}>
+                    🗺️ දුර: <strong>{routeDistance}</strong> | ගතවන කාලය: <strong>{routeDuration}</strong>
+                  </div>
+                )}
+
                 <button onClick={handlePublishRide} style={primaryBtn}>🚀 Publish Ride Route</button>
 
-                {/* Active Rides View */}
+                {/* Active Rides List */}
                 <h4 style={{ color: "#38bdf8", marginTop: "15px", marginBottom: "8px" }}>📢 Active Published Rides</h4>
                 <div style={{ maxHeight: "200px", overflowY: "auto" }}>
                   {ridePosts.map((ride) => (
@@ -564,22 +588,16 @@ export default function GalaxyRides3D() {
                 </div>
               </div>
 
-              {/* MAP WITH LIVE REAL ROAD ROUTING POLYLINE */}
+              {/* MAP WITH LIVE REAL ROAD ROUTING */}
               <div style={{ height: "550px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
                 <MapContainer center={startCoords} zoom={8} style={{ height: "100%", width: "100%" }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <MapController start={startCoords} end={endCoords} />
                   <Marker position={startCoords}><Popup>🟢 Start: {startQuery}</Popup></Marker>
                   <Marker position={endCoords}><Popup>🔴 Destination: {endQuery}</Popup></Marker>
 
-                  {/* Real Road Line */}
                   {roadRoute.length > 0 && (
-                    <Polyline
-                      positions={roadRoute}
-                      pathOptions={{
-                        color: selectedRouteType === "normal" ? "#3b82f6" : selectedRouteType === "shortest" ? "#22c55e" : "#a855f7",
-                        weight: 5,
-                      }}
-                    />
+                    <Polyline positions={roadRoute} pathOptions={{ color: "#2563eb", weight: 5 }} />
                   )}
                 </MapContainer>
               </div>
@@ -600,6 +618,5 @@ const labelStyle = { fontSize: "0.8rem", color: "#cbd5e1", display: "block", mar
 const primaryBtn = { width: "100%", padding: "10px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold" as const, cursor: "pointer" };
 const navStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", background: "#1e293b", padding: "10px 15px", borderRadius: "10px", border: "1px solid #334155" };
 const langBtn = (active: boolean) => ({ padding: "5px 10px", background: active ? "#0284c7" : "#334155", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" });
-const suggestBox = { background: "#0f172a", border: "1px solid #38bdf8", borderRadius: "6px", marginTop: "4px", maxHeight: "120px", overflowY: "auto" as const };
-const suggestItem = { padding: "6px", fontSize: "0.8rem", cursor: "pointer", borderBottom: "1px solid #1e293b" };
-const routeTypeBtn = (active: boolean, activeColor: string) => ({ flex: 1, padding: "8px", background: active ? activeColor : "#0f172a", color: "#fff", border: active ? "1px solid #fff" : "1px solid #334155", borderRadius: "6px", cursor: "pointer", fontSize: "0.75rem", fontWeight: "bold" as const });
+const suggestBox = { position: "absolute" as const, zIndex: 1000, width: "100%", background: "#0f172a", border: "1px solid #38bdf8", borderRadius: "6px", marginTop: "4px", maxHeight: "160px", overflowY: "auto" as const };
+const suggestItem = { padding: "8px", fontSize: "0.8rem", cursor: "pointer", borderBottom: "1px solid #1e293b", color: "#f8fafc" };
