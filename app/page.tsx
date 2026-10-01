@@ -1,4 +1,4 @@
-"use "use client";
+"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
@@ -140,7 +140,7 @@ const translations = {
     publishLive: "🚀 Route එක පළ කරන්න",
     myPostedRides: "📋 මා පළ කළ Rides",
     edit: "✏️ Edit",
-    delete: "🗑️ Delete",
+    delete: "🗑️️ Delete",
     markFinished: "✅ අවසන් කරන්න (Mark Finished)",
     finishedRidesArchive: "🏁 අවසන් වූ Rides ✅ Archive (මකා දැමිය නොහැක)",
     searchPassengerDest: "🏁 ඔබට යා යුතු ස්ථානය (End Point) Type කරන්න",
@@ -154,7 +154,7 @@ const translations = {
   },
   en: {
     title: "🌌 Galaxy Rides 3D",
-    passenger: "🙋‍♂️️ Passenger",
+    passenger: "🙋‍♂️ Passenger",
     driver: "🚗 Driver",
     login: "Login",
     register: "Register",
@@ -469,10 +469,9 @@ export default function GalaxyRidesApp() {
     e.preventDefault();
     if (!currentUser) return;
 
-    // Simulate submitting KYC (Sets status to PENDING or APPROVED for demo)
     setCurrentUser({
       ...currentUser,
-      kycStatus: "PENDING", // Change to "APPROVED" if you want instant approval
+      kycStatus: "PENDING",
       nicNumber: nicInput,
       licenseNumber: licenseInput,
       vehicleType: vehTypeInput,
