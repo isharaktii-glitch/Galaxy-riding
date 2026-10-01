@@ -70,20 +70,21 @@ export default function GalaxyRides3D() {
   const [lang, setLang] = useState<Language>("si");
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  
-  // Auth Mode: Login or Register
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+
+  // Auth States (Login vs Register)
+  const [authMode, setAuthMode] = useState<"login" | "register">("register");
   const [currentTab, setCurrentTab] = useState<"dashboard" | "kyc">("dashboard");
 
-  // Auth Inputs
+  // Registration & User Inputs
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedRole, setSelectedRole] = useState<"passenger" | "driver">("driver");
   const [passError, setPassError] = useState("");
 
-  // KYC States
+  // Driver KYC & Camera Verification States
   const [nicNumber, setNicNumber] = useState("");
   const [idPhotoUrl, setIdPhotoUrl] = useState("");
   const [liveFacePhoto, setLiveFacePhoto] = useState<string | null>(null);
@@ -105,12 +106,12 @@ export default function GalaxyRides3D() {
   const [endCoords, setEndCoords] = useState<[number, number]>([7.2906, 80.6337]);
   const [startSuggestions, setStartSuggestions] = useState<Suggestion[]>([]);
   const [endSuggestions, setEndSuggestions] = useState<Suggestion[]>([]);
-  
+
   const [roadRoute, setRoadRoute] = useState<[number, number][]>([]);
   const [routeDistance, setRouteDistance] = useState<string>("115 km");
   const [routeDuration, setRouteDuration] = useState<string>("3 hrs 10 mins");
   const [selectedRouteType, setSelectedRouteType] = useState<"normal" | "shortest" | "ai_fastest">("normal");
-  
+
   const [ridePosts, setRidePosts] = useState<RidePost[]>([]);
 
   useEffect(() => {
@@ -123,7 +124,7 @@ export default function GalaxyRides3D() {
     }
   }, []);
 
-  // Fetch Road Geometry (OSRM Routing API)
+  // Fetch Road Polyline (OSRM Routing API)
   const fetchRoadRoute = async (start: [number, number], end: [number, number]) => {
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
@@ -151,7 +152,7 @@ export default function GalaxyRides3D() {
     }
   }, [startCoords, endCoords, isClient]);
 
-  // Password Validation
+  // Strong Password Validation Rule
   const handlePasswordChange = (val: string) => {
     setPassword(val);
     if (authMode === "register") {
@@ -166,32 +167,30 @@ export default function GalaxyRides3D() {
     }
   };
 
-  // Auth Submit Handle (Register or Login)
+  // Auth Action Handler
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (authMode === "register" && passError) return;
 
     if (authMode === "login") {
-      // Demo Login Logic
       const user: User = {
         id: "USR-1001",
-        name: username || "Ishara Driver",
-        username: username || "ishara",
+        name: username || "Driver / Passenger",
+        username: username || "user123",
         email: email || "user@galaxy.com",
         phone: "0771234567",
-        role: "passenger",
+        role: selectedRole,
         isVerifiedDriver: false,
       };
       setCurrentUser(user);
     } else {
-      // Register Logic
       const user: User = {
         id: "USR-" + Date.now().toString().slice(-4),
         name: fullName,
         username,
         email,
         phone,
-        role: "passenger",
+        role: selectedRole,
         isVerifiedDriver: false,
       };
       setCurrentUser(user);
@@ -199,7 +198,7 @@ export default function GalaxyRides3D() {
     setCurrentTab("dashboard");
   };
 
-  // Camera Logic
+  // Camera Activation
   const startLiveCamera = async () => {
     setIsCameraActive(true);
     try {
@@ -266,7 +265,7 @@ export default function GalaxyRides3D() {
     }
   };
 
-  // Publish Ride (Anyone can publish - Verified or Unverified)
+  // Publish Ride (Verified or Unverified drivers can publish)
   const handlePublishRide = () => {
     if (!currentUser) return;
     const newRide: RidePost = {
@@ -321,10 +320,10 @@ export default function GalaxyRides3D() {
       </div>
 
       {!currentUser ? (
-        /* LOGIN / REGISTER FORM WITH TOGGLE */
+        /* LOGIN & REGISTER AUTH CONTAINER WITH ROLE SELECTION */
         <div style={centerFlex}>
           <div style={cardStyle}>
-            {/* Form Mode Selector Header */}
+            {/* Mode Switcher Tabs */}
             <div style={{ display: "flex", borderBottom: "2px solid #334155", marginBottom: "15px" }}>
               <button
                 type="button"
@@ -363,6 +362,45 @@ export default function GalaxyRides3D() {
             </div>
 
             <form onSubmit={handleAuthSubmit} style={formStyle}>
+              {/* Role Selection Option */}
+              <div>
+                <label style={labelStyle}>ඔබ ලියාපදිංචි වන්නේ කෙසේද? (Select Role)</label>
+                <div style={{ display: "flex", gap: "10px", marginBottom: "5px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole("driver")}
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      background: selectedRole === "driver" ? "#0284c7" : "#0f172a",
+                      color: "#fff",
+                      border: selectedRole === "driver" ? "2px solid #38bdf8" : "1px solid #334155",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontWeight: "bold"
+                    }}
+                  >
+                    🚗 Driver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole("passenger")}
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      background: selectedRole === "passenger" ? "#0284c7" : "#0f172a",
+                      color: "#fff",
+                      border: selectedRole === "passenger" ? "2px solid #38bdf8" : "1px solid #334155",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontWeight: "bold"
+                    }}
+                  >
+                    👤 Passenger
+                  </button>
+                </div>
+              </div>
+
               {authMode === "register" ? (
                 <>
                   <input type="text" placeholder="සම්පූර්ණ නම" value={fullName} onChange={(e) => setFullName(e.target.value)} required style={inputStyle} />
@@ -386,7 +424,6 @@ export default function GalaxyRides3D() {
               </button>
             </form>
 
-            {/* Bottom Toggle Link */}
             <div style={{ textAlign: "center", marginTop: "15px", fontSize: "0.85rem", color: "#94a3b8" }}>
               {authMode === "login" ? (
                 <span>
@@ -407,20 +444,20 @@ export default function GalaxyRides3D() {
           </div>
         </div>
       ) : (
-        /* DASHBOARD & RIDE PUBLISHER */
+        /* DASHBOARD, KYC & RIDE PUBLISHER WITH MAP */
         <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-          <div style={{ ...cardStyle, marginBottom: "15px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ ...cardStyle, maxWidth: "100%", marginBottom: "15px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <h3 style={{ margin: 0, color: "#38bdf8" }}>ආයුබෝවන්, {currentUser.name}! 👋</h3>
+              <h3 style={{ margin: 0, color: "#38bdf8" }}>ආයුබෝවන්, {currentUser.name}! 👋 ({currentUser.role.toUpperCase()})</h3>
               <p style={{ margin: "4px 0 0 0", fontSize: "0.85rem" }}>
-                Status: {currentUser.isVerifiedDriver ? <span style={{ color: "#22c55e", fontWeight: "bold" }}>Verified Driver ✅</span> : <span style={{ color: "#eab308" }}>Unverified Driver / Passenger 👤</span>}
+                Status: {currentUser.isVerifiedDriver ? <span style={{ color: "#22c55e", fontWeight: "bold" }}>Verified Driver ✅</span> : <span style={{ color: "#eab308" }}>Unverified User 👤</span>}
               </p>
             </div>
             <button onClick={() => setCurrentUser(null)} style={{ padding: "6px 12px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" }}>Logout</button>
           </div>
 
           {currentTab === "kyc" ? (
-            /* KYC Form */
+            /* Driver KYC Form */
             <div style={{ ...cardStyle, maxWidth: "550px", margin: "0 auto" }}>
               <button onClick={() => setCurrentTab("dashboard")} style={{ background: "transparent", color: "#38bdf8", border: "none", cursor: "pointer", marginBottom: "10px" }}>⬅️ Back to Dashboard</button>
               <h3 style={{ color: "#38bdf8", marginTop: 0 }}>🪪 Driver ID & Live Face Verification</h3>
@@ -454,9 +491,9 @@ export default function GalaxyRides3D() {
               </form>
             </div>
           ) : (
-            /* Ride Publisher & Map View */
+            /* Ride Route Publisher & Interactive Map */
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "15px" }}>
-              <div style={cardStyle}>
+              <div style={{ ...cardStyle, maxWidth: "100%" }}>
                 <h3 style={{ color: "#38bdf8", marginTop: 0 }}>🚗 Ride Route Publisher</h3>
 
                 <div style={{ marginBottom: "10px" }}>
@@ -487,7 +524,7 @@ export default function GalaxyRides3D() {
                   )}
                 </div>
 
-                {/* AI ROUTE SELECTION */}
+                {/* AI SHORTCUT & ROUTE TYPE SELECTION */}
                 <div style={{ marginBottom: "12px" }}>
                   <label style={labelStyle}>🛣️ Select Route Type (AI Shortcut Engine)</label>
                   <div style={{ display: "flex", gap: "6px" }}>
@@ -504,7 +541,7 @@ export default function GalaxyRides3D() {
 
                 <button onClick={handlePublishRide} style={primaryBtn}>🚀 Publish Ride Route</button>
 
-                {/* Published Rides List */}
+                {/* Active Rides View */}
                 <h4 style={{ color: "#38bdf8", marginTop: "15px", marginBottom: "8px" }}>📢 Active Published Rides</h4>
                 <div style={{ maxHeight: "200px", overflowY: "auto" }}>
                   {ridePosts.map((ride) => (
@@ -527,14 +564,14 @@ export default function GalaxyRides3D() {
                 </div>
               </div>
 
-              {/* MAP WITH LIVE OSRM ROAD ROUTE */}
-              <div style={{ height: "520px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
+              {/* MAP WITH LIVE REAL ROAD ROUTING POLYLINE */}
+              <div style={{ height: "550px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
                 <MapContainer center={startCoords} zoom={8} style={{ height: "100%", width: "100%" }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <Marker position={startCoords}><Popup>🟢 Start: {startQuery}</Popup></Marker>
                   <Marker position={endCoords}><Popup>🔴 Destination: {endQuery}</Popup></Marker>
-                  
-                  {/* Real Road Polyline */}
+
+                  {/* Real Road Line */}
                   {roadRoute.length > 0 && (
                     <Polyline
                       positions={roadRoute}
@@ -554,7 +591,7 @@ export default function GalaxyRides3D() {
   );
 }
 
-// Styling Constants
+// Layout Styles
 const centerFlex = { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "75vh" };
 const cardStyle = { background: "#1e293b", padding: "20px", borderRadius: "16px", border: "1px solid #334155", width: "100%", maxWidth: "450px", boxSizing: "border-box" as const };
 const formStyle = { display: "flex", flexDirection: "column" as const, gap: "10px" };
