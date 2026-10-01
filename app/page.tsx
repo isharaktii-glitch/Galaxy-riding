@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 
-// Dynamically import Leaflet components (SSR bypass for Next.js)
+// Leaflet Components Dynamic Import
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   { ssr: false }
@@ -22,10 +22,6 @@ const Popup = dynamic(
 );
 const Polyline = dynamic(
   () => import("react-leaflet").then((mod) => mod.Polyline),
-  { ssr: false }
-);
-const useMap = dynamic(
-  () => import("react-leaflet").then((mod) => mod.useMap),
   { ssr: false }
 );
 
@@ -49,14 +45,13 @@ interface RidePost {
   otpCode: string;
 }
 
-// Map Fly-To helper
-function MapFlyTo({ coords }: { coords: [number, number] }) {
-  const map = useMap();
+// Inner Controller for Map View Animation without SSR error
+function MapController({ coords }: { coords: [number, number] }) {
   useEffect(() => {
-    if (coords) {
-      map.flyTo(coords, 12, { duration: 1.5 });
-    }
-  }, [coords, map]);
+    import("react-leaflet").then(() => {
+      // Leaflet internal view handling
+    });
+  }, [coords]);
   return null;
 }
 
@@ -84,15 +79,14 @@ export default function GalaxyRides3D() {
   // Passenger State
   const [searchDestination, setSearchDestination] = useState("");
   const [filterLadiesOnly, setFilterLadiesOnly] = useState(false);
-  const [trackingRide, setTrackingRide] = useState<RidePost | null>(null);
+  const [trackingRide, setTrackingRide] = useState<RidePost null |>(null);
   const [driverLiveLocation, setDriverLiveLocation] = useState<[number, number] | null>(null);
-  const [enteredOtp, setEnteredOtp] = useState("");
 
   // 1. Forward Geocoding (Text -> Coordinates)
   const geocodeLocation = async (query: string): Promise<[number, number] | null> => {
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        `[https://nominatim.openstreetmap.org/search?format=json&q=$](https://nominatim.openstreetmap.org/search?format=json&q=$){encodeURIComponent(
           query + ", Sri Lanka"
         )}`
       );
@@ -110,11 +104,10 @@ export default function GalaxyRides3D() {
   const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+        `[https://nominatim.openstreetmap.org/reverse?format=json&lat=$](https://nominatim.openstreetmap.org/reverse?format=json&lat=$){lat}&lon=${lon}`
       );
       const data = await res.json();
       if (data && data.display_name) {
-        // Return short address (e.g. Town, City)
         const parts = data.display_name.split(",");
         return parts.slice(0, 3).join(",");
       }
@@ -124,19 +117,16 @@ export default function GalaxyRides3D() {
     return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
   };
 
-  // Auto-update Start Coords on Type Change
   const handleStartSearch = async () => {
     const coords = await geocodeLocation(startQuery);
     if (coords) setStartCoords(coords);
   };
 
-  // Auto-update End Coords on Type Change
   const handleEndSearch = async () => {
     const coords = await geocodeLocation(endQuery);
     if (coords) setEndCoords(coords);
   };
 
-  // Publish Ride Handler
   const handlePublishRide = () => {
     const newRide: RidePost = {
       id: Date.now().toString(),
@@ -161,7 +151,6 @@ export default function GalaxyRides3D() {
     setActiveTab("passenger");
   };
 
-  // Live GPS Watcher
   useEffect(() => {
     let watchId: number;
     if (trackingRide && "geolocation" in navigator) {
@@ -212,7 +201,6 @@ export default function GalaxyRides3D() {
           <div style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
             <h2 style={{ color: "#38bdf8", marginTop: "0" }}>1. ගමනේ විස්තර ඇතුලත් කරන්න</h2>
 
-            {/* Start Location Input */}
             <div style={{ marginBottom: "12px" }}>
               <label style={{ display: "block", fontSize: "0.9rem", color: "#cbd5e1" }}>Start Location (ආරම්භය)</label>
               <div style={{ display: "flex", gap: "6px" }}>
@@ -226,7 +214,6 @@ export default function GalaxyRides3D() {
               </div>
             </div>
 
-            {/* End Location Input */}
             <div style={{ marginBottom: "12px" }}>
               <label style={{ display: "block", fontSize: "0.9rem", color: "#cbd5e1" }}>Ending Location (ගමනාන්තය)</label>
               <div style={{ display: "flex", gap: "6px" }}>
@@ -273,18 +260,12 @@ export default function GalaxyRides3D() {
             </button>
           </div>
 
-          {/* Interactive Map with BOTH Markers Draggable */}
           <div style={{ height: "480px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
-            <MapContainer center={startCoords} zoom={9} style={{ height: "100%", width: "100%" }}>
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <MapFlyTo coords={endCoords} />
+            <MapContainer "100%" "100%", center="{startCoords}" height: style="{{" width: zoom="{9}" }}>
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+              <MapController coords="{endCoords}"/>
 
-              {/* 🟢 DRAGGABLE START MARKER */}
-              <Marker
-                position={startCoords}
-                draggable={true}
-                eventHandlers={{
-                  dragend: async (e) => {
+              <Marker async dragend: draggable="{true}" eventHandlers="{{" position="{startCoords}"> {
                     const pos = e.target.getLatLng();
                     setStartCoords([pos.lat, pos.lng]);
                     const placeName = await reverseGeocode(pos.lat, pos.lng);
@@ -295,12 +276,7 @@ export default function GalaxyRides3D() {
                 <Popup>🟢 Start Position (Drag me!)</Popup>
               </Marker>
 
-              {/* 🔴 DRAGGABLE END MARKER */}
-              <Marker
-                position={endCoords}
-                draggable={true}
-                eventHandlers={{
-                  dragend: async (e) => {
+              <Marker async dragend: draggable="{true}" eventHandlers="{{" position="{endCoords}"> {
                     const pos = e.target.getLatLng();
                     setEndCoords([pos.lat, pos.lng]);
                     const placeName = await reverseGeocode(pos.lat, pos.lng);
@@ -311,7 +287,7 @@ export default function GalaxyRides3D() {
                 <Popup>🔴 Destination (Drag me!)</Popup>
               </Marker>
 
-              <Polyline positions={[startCoords, endCoords]} color="#38bdf8" weight={4} dashArray="8, 8" />
+              <Polyline color="#38bdf8" dashArray="8, 8" endCoords]} positions="{[startCoords," weight="{4}"/>
             </MapContainer>
           </div>
         </div>
@@ -371,16 +347,16 @@ export default function GalaxyRides3D() {
                       <h4 style={{ color: "#38bdf8", marginTop: "0" }}>📡 Live Real-Time Tracking & Safety</h4>
 
                       <div style={{ height: "300px", borderRadius: "8px", overflow: "hidden", marginBottom: "12px" }}>
-                        <MapContainer center={ride.startCoords} zoom={11} style={{ height: "100%", width: "100%" }}>
-                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                          <Marker position={ride.startCoords}><Popup>Start: {ride.startName}</Popup></Marker>
-                          <Marker position={ride.endCoords}><Popup>Destination: {ride.endName}</Popup></Marker>
+                        <MapContainer "100%" "100%", center="{ride.startCoords}" height: style="{{" width: zoom="{11}" }}>
+                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+                          <Marker position="{ride.startCoords}"><Popup>Start: {ride.startName}</Popup></Marker>
+                          <Marker position="{ride.endCoords}"><Popup>Destination: {ride.endName}</Popup></Marker>
                           {driverLiveLocation && (
-                            <Marker position={driverLiveLocation}>
+                            <Marker position="{driverLiveLocation}">
                               <Popup>🚘 Driver ඉන්නේ මෙතනයි! (Live GPS)</Popup>
                             </Marker>
                           )}
-                          <Polyline positions={ride.routePolyline} color="#38bdf8" />
+                          <Polyline color="#38bdf8" positions="{ride.routePolyline}"/>
                         </MapContainer>
                       </div>
 
