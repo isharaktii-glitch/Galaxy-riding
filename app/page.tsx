@@ -66,6 +66,7 @@ const translations = {
     noAccount: "ගිණුමක් නැද්ද? ලියාපදිංචි වන්න",
     hasAccount: "දැනටමත් ගිණුමක් තිබේද? ඇතුළු වන්න",
     fullName: "සම්පූර්ණ නම",
+    email: "විද්‍යුත් තැපෑල (Email Address)",
     phone: "දුරකථන අංකය",
     password: "මුරපදය (Password)",
     driverIdRegTitle: "🪪 Driver ID සහ වාහන ලියාපදිංචිය",
@@ -106,6 +107,7 @@ const translations = {
     noAccount: "Don't have an account? Register",
     hasAccount: "Already have an account? Login",
     fullName: "Full Name",
+    email: "Email Address",
     phone: "Phone Number",
     password: "Password",
     driverIdRegTitle: "🪪 Driver ID & Vehicle Registration",
@@ -146,6 +148,7 @@ const translations = {
     noAccount: "கணக்கு இல்லையா? பதிவு செய்",
     hasAccount: "ஏற்கனவே கணக்கு உள்ளதா? உள்நுழைக",
     fullName: "முழு பெயர்",
+    email: "மின்னஞ்சல் முகவரி (Email)",
     phone: "தொலைபேசி எண்",
     password: "கடவுச்சொல் (Password)",
     driverIdRegTitle: "🪪 ஓட்டுநர் ID & வாகன பதிவு",
@@ -182,6 +185,7 @@ const translations = {
 interface User {
   id: string;
   name: string;
+  email: string;
   phone: string;
   role: "driver" | "passenger";
   driverIdNo?: string;
@@ -248,6 +252,7 @@ export default function GalaxyRides3D() {
   const [selectedRole, setSelectedRole] = useState<"driver" | "passenger">("passenger");
 
   const [nameInput, setNameInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
 
@@ -416,7 +421,7 @@ export default function GalaxyRides3D() {
       if (vehicleCategory === "Van/Mini Bus") {
         shortcutAdvice = `🚐 Vehicle Type: Van/Mini Bus\n⚠️ WARNING: Stick to main highways. Avoid narrow interior lanes around ${endQuery.split(",")[0]}.\n🛣️ Best Route: Main A-Grade Highways. Recommended bypass shortcut via Outer Circular Road.`;
       } else if (vehicleCategory === "Bike") {
-        shortcutAdvice = `🏍️ Vehicle Type: Motorcycle\n⚡ Fast By-Pass Active: Can utilize narrow interior shortcuts, bypass traffic signals through local roads. Total saved time ~15 mins.`;
+        shortcutAdvice = `🏍️️ Vehicle Type: Motorcycle\n⚡ Fast By-Pass Active: Can utilize narrow interior shortcuts, bypass traffic signals through local roads. Total saved time ~15 mins.`;
       } else {
         shortcutAdvice = `🚗 Vehicle Category: Sedan / Medium Car\n✅ AI Shortcut Detected: Use B-grade secondary connector roads to bypass heavy traffic near ${startQuery.split(",")[0]}. Watch out for sharp turns.`;
       }
@@ -430,12 +435,13 @@ export default function GalaxyRides3D() {
 
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phoneInput || !passwordInput) return;
+    if (!emailInput || !passwordInput) return;
 
     const user: User = {
       id: "USR-" + Date.now().toString().slice(-4),
       name: nameInput || (selectedRole === "driver" ? "Driver User" : "Passenger User"),
-      phone: phoneInput,
+      email: emailInput,
+      phone: phoneInput || "N/A",
       role: selectedRole,
       isProfileComplete: selectedRole === "passenger",
     };
@@ -777,10 +783,10 @@ export default function GalaxyRides3D() {
                 />
               )}
               <input
-                type="text"
-                placeholder={t.phone}
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
+                type="email"
+                placeholder={t.email}
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
                 style={{
                   padding: "10px",
                   borderRadius: "6px",
@@ -790,6 +796,22 @@ export default function GalaxyRides3D() {
                 }}
                 required
               />
+              {authMode === "register" && (
+                <input
+                  type="text"
+                  placeholder={t.phone}
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  style={{
+                    padding: "10px",
+                    borderRadius: "6px",
+                    background: "#0f172a",
+                    color: "#fff",
+                    border: "1px solid #475569",
+                  }}
+                  required
+                />
+              )}
               <input
                 type="password"
                 placeholder={t.password}
@@ -970,7 +992,7 @@ export default function GalaxyRides3D() {
               <div>
                 <h2 style={{ margin: 0, color: "#38bdf8" }}>{t.title}</h2>
                 <p style={{ margin: 0, color: "#94a3b8", fontSize: "0.85rem" }}>
-                  {currentUser.name} | ID:{" "}
+                  {currentUser.name} ({currentUser.email}) | ID:{" "}
                   <b>{currentUser.driverIdNo || currentUser.id}</b> (
                   {currentUser.role.toUpperCase()})
                 </p>
