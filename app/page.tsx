@@ -63,6 +63,8 @@ const translations = {
     driver: "🚗 රියදුරු (Driver)",
     login: "ඇතුළු වන්න (Login)",
     register: "ලියාපදිංචි වන්න (Register)",
+    noAccount: "ගිණුමක් නැද්ද? ලියාපදිංචි වන්න",
+    hasAccount: "දැනටමත් ගිණුමක් තිබේද? ඇතුළු වන්න",
     fullName: "සම්පූර්ණ නම",
     phone: "දුරකථන අංකය",
     password: "මුරපදය (Password)",
@@ -101,6 +103,8 @@ const translations = {
     driver: "🚗 Driver",
     login: "Login",
     register: "Register",
+    noAccount: "Don't have an account? Register",
+    hasAccount: "Already have an account? Login",
     fullName: "Full Name",
     phone: "Phone Number",
     password: "Password",
@@ -110,7 +114,7 @@ const translations = {
     vehicleCategory: "Vehicle Category",
     completeDriverProfile: "Complete Driver Profile",
     logout: "Logout",
-    editRide: "✏ Edit Ride Post",
+    editRide: "✏️ Edit Ride Post",
     publishRide: "🚗 Publish New Route",
     startLoc: "Start Location (Google/OSRM Search)",
     endLoc: "End Destination (Google/OSRM Search)",
@@ -139,6 +143,8 @@ const translations = {
     driver: "🚗 ஓட்டுநர் (Driver)",
     login: "உள்நுழைக (Login)",
     register: "பதிவு செய்க (Register)",
+    noAccount: "கணக்கு இல்லையா? பதிவு செய்",
+    hasAccount: "ஏற்கனவே கணக்கு உள்ளதா? உள்நுழைக",
     fullName: "முழு பெயர்",
     phone: "தொலைபேசி எண்",
     password: "கடவுச்சொல் (Password)",
@@ -150,7 +156,7 @@ const translations = {
     logout: "வெளியேறு (Logout)",
     editRide: "✏️ Ride Post திருத்துக",
     publishRide: "🚗 புதிய வழியைப் பதிவேற்றுக",
-    startLoc: "தொ தொடங்கும் இடம் (Start Location)",
+    startLoc: "தொடங்கும் இடம் (Start Location)",
     endLoc: "சேரும் இடம் (End Destination)",
     aiShortcutBtn: "🤖 AI மூலம் குறுகிய வழியைக் கண்டறியவும்",
     aiAnalyzing: "⏳ AI குறுகிய பாதையை பகுப்பாய்வு செய்கிறது...",
@@ -663,13 +669,15 @@ export default function GalaxyRides3D() {
             <h1 style={{ color: "#38bdf8", textAlign: "center", marginTop: 0 }}>
               {t.title}
             </h1>
+
+            {/* Role Switcher */}
             <div
               style={{
                 display: "flex",
                 background: "#0f172a",
                 padding: "4px",
                 borderRadius: "8px",
-                marginBottom: "20px",
+                marginBottom: "15px",
               }}
             >
               <button
@@ -703,6 +711,48 @@ export default function GalaxyRides3D() {
                 }}
               >
                 {t.driver}
+              </button>
+            </div>
+
+            {/* Auth Mode Switcher (Login vs Register) */}
+            <div
+              style={{
+                display: "flex",
+                borderBottom: "1px solid #334155",
+                marginBottom: "20px",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setAuthMode("login")}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: authMode === "login" ? "2px solid #38bdf8" : "none",
+                  color: authMode === "login" ? "#38bdf8" : "#94a3b8",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                {t.login}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMode("register")}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: authMode === "register" ? "2px solid #38bdf8" : "none",
+                  color: authMode === "register" ? "#38bdf8" : "#94a3b8",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                {t.register}
               </button>
             </div>
 
@@ -764,11 +814,26 @@ export default function GalaxyRides3D() {
                   borderRadius: "8px",
                   fontWeight: "bold",
                   cursor: "pointer",
+                  marginTop: "10px",
                 }}
               >
                 {authMode === "login" ? t.login : t.register}
               </button>
             </form>
+
+            <p
+              onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}
+              style={{
+                textAlign: "center",
+                color: "#38bdf8",
+                fontSize: "0.85rem",
+                marginTop: "15px",
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              {authMode === "login" ? t.noAccount : t.hasAccount}
+            </p>
           </div>
         </div>
       ) : currentUser.role === "driver" && !currentUser.isProfileComplete ? (
