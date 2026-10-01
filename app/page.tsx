@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 
-// Safe Dynamic Imports for Leaflet (Prevents SSR Client-side Exception on Vercel)
+// Safe Dynamic Imports for Leaflet (Prevents SSR Client-side Exception)
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
   { ssr: false }
@@ -52,6 +52,7 @@ interface RidePost {
   driverId: string;
   driverName: string;
   driverPhone: string;
+  isVerifiedDriver: boolean;
   vehicle: string;
   price: number;
   startName: string;
@@ -68,6 +69,9 @@ export default function GalaxyRides3D() {
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
+
+  // Navigation View State (dashboard / kyc)
+  const [currentTab, setCurrentTab] = useState<"dashboard" | "kyc">("dashboard");
 
   // Initial Registration States
   const [fullName, setFullName] = useState("");
@@ -122,7 +126,7 @@ export default function GalaxyRides3D() {
     setPassword(val);
     const strongRegex = new RegExp("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})");
     if (!strongRegex.test(val)) {
-      setPassError("අවම අකුරු 8ක්, Capital/Simple letters, අංකයක් සහ විශේෂ ලකුණක් (!@#$%^&*) ඇතුළත් කරන්න.");
+      setPassError("අවම අකුරු 8ක්, Capital/Simple, අංකයක් සහ විශේෂ ලකුණක් (!@#$%^&*) තියෙන්න ඕන.");
     } else {
       setPassError("");
     }
@@ -143,7 +147,7 @@ export default function GalaxyRides3D() {
       isVerifiedDriver: false,
     };
     setCurrentUser(user);
-    alert("🎉 ලියාපදිංචිය සාර්ථකයි! Dashboard එකට සාදරයෙන් පිළිගනිමු.");
+    setCurrentTab("dashboard");
   };
 
   // Start Live Camera
@@ -151,13 +155,13 @@ export default function GalaxyRides3D() {
     setIsCameraActive(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" }, // Front Selfie Camera
+        video: { facingMode: "user" },
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch (err) {
-      alert("කැමරාව Open කිරීමට නොහැකි විය. Permission පරීක්ෂා කරන්න.");
+      alert("කැමරාව Open කිරීමට නොහැකි විය. Camera Permissions පරීක්ෂා කරන්න.");
       setIsCameraActive(false);
     }
   };
@@ -173,7 +177,6 @@ export default function GalaxyRides3D() {
         const dataUrl = canvasRef.current.toDataURL("image/png");
         setLiveFacePhoto(dataUrl);
 
-        // Stop Camera Stream
         const stream = videoRef.current.srcObject as MediaStream;
         if (stream) {
           stream.getTracks().forEach((track) => track.stop());
@@ -209,10 +212,13 @@ export default function GalaxyRides3D() {
           vehicleCategory,
         });
       }
-    }, 2800);
+      setTimeout(() => {
+        setCurrentTab("dashboard");
+      }, 1500);
+    }, 2500);
   };
 
-  // Route Autocomplete & Maps
+  // Search Suggestions
   const fetchSuggestions = async (query: string, setFn: (data: Suggestion[]) => void) => {
     if (query.trim().length < 2) return setFn([]);
     try {
@@ -224,6 +230,7 @@ export default function GalaxyRides3D() {
     }
   };
 
+  // Publish Ride
   const handlePublishRide = () => {
     if (!currentUser) return;
     const newRide: RidePost = {
@@ -231,6 +238,7 @@ export default function GalaxyRides3D() {
       driverId: currentUser.id,
       driverName: currentUser.name,
       driverPhone: currentUser.phone,
+      isVerifiedDriver: !!currentUser.isVerifiedDriver,
       vehicle,
       price,
       startName: startQuery,
@@ -252,14 +260,29 @@ export default function GalaxyRides3D() {
       {/* Navbar */}
       <div style={navStyle}>
         <h2 style={{ color: "#38bdf8", margin: 0 }}>🌌 Galaxy Rides 3D</h2>
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {currentUser && (
+            <button
+              onClick={() => setCurrentTab(currentTab === "dashboard" ? "kyc" : "dashboard")}
+              style={{
+                padding: "6px 12px",
+                background: currentUser.isVerifiedDriver ? "#16a34a" : "#0284c7",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
+            >
+              {currentUser.isVerifiedDriver ? "✅ Verified Driver" : "🪪 Become a Driver (KYC)"}
+            </button>
+          )}
           <button onClick={() => setLang("si")} style={langBtn(lang === "si")}>සිංහල</button>
           <button onClick={() => setLang("en")} style={langBtn(lang === "en")}>English</button>
-          <button onClick={() => setLang("ta")} style={langBtn(lang === "ta")}>தமிழ்</button>
         </div>
       </div>
 
-      {/* 1. INITIAL REGISTRATION / LOGIN FORM */}
+      {/* 1. INITIAL REGISTRATION FORM */}
       {!currentUser ? (
         <div style={centerFlex}>
           <div style={cardStyle}>
@@ -296,27 +319,29 @@ export default function GalaxyRides3D() {
           </div>
         </div>
       ) : (
-        /* 2. USER DASHBOARD & LIVE CAMERA KYC VERIFICATION */
+        /* 2. MAIN DASHBOARD OR SEPARATE KYC FORM */
         <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-          <div style={{ ...cardStyle, marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", maxWidth: "100%" }}>
+          {/* User Status Bar */}
+          <div style={{ ...cardStyle, marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <h3 style={{ margin: 0, color: "#38bdf8" }}>ආයුබෝවන්, {currentUser.name}! 👋</h3>
               <p style={{ margin: "4px 0 0 0", color: "#94a3b8", fontSize: "0.85rem" }}>
-                @{currentUser.username} | Status: {currentUser.isVerifiedDriver ? <span style={{ color: "#22c55e", fontWeight: "bold" }}>✅ Verified Driver</span> : <span>🙋‍♂️ Passenger</span>}
+                Status: {currentUser.isVerifiedDriver ? <span style={{ color: "#22c55e", fontWeight: "bold" }}>Verified Driver ✅</span> : <span style={{ color: "#cbd5e1" }}>Passenger 👤</span>}
               </p>
             </div>
-            <button onClick={() => setCurrentUser(null)} style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" }}> Logout</button>
+            <button onClick={() => setCurrentUser(null)} style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" }}>Logout</button>
           </div>
 
-          {/* DRIVER KYC VERIFICATION FORM WITH LIVE CAMERA */}
-          {!currentUser.isVerifiedDriver ? (
+          {/* TAB 1: SEPARATE DRIVER KYC FORM */}
+          {currentTab === "kyc" ? (
             <div style={{ ...cardStyle, maxWidth: "600px", margin: "0 auto" }}>
+              <button onClick={() => setCurrentTab("dashboard")} style={{ background: "transparent", color: "#38bdf8", border: "none", cursor: "pointer", marginBottom: "10px" }}>⬅️ Dashboard එකට යන්න</button>
               <h3 style={{ color: "#38bdf8", marginTop: 0 }}>🪪 Driver ID & Live Face Verification</h3>
-              <p style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>ආරක්ෂාව සඳහා ඔබේ ID එක සහ Live Camera Scan එකක් ලබාදී AI Verification සාර්ථක කරගන්න.</p>
+              <p style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>Driver කෙනෙක් විදිහට Verified Label එක ලබාගැනීමට ඔබේ ID එක සහ Live Camera Scan එක සම්පූර්ණ කරන්න.</p>
 
               <form onSubmit={handleVerifyDriver} style={formStyle}>
                 <div>
-                  <label style={labelStyle}>NIC or Driver's License Number</label>
+                  <label style={labelStyle}>NIC / Driver's License Number</label>
                   <input type="text" placeholder="1998XXXXXV / 98234XXXX" value={nicNumber} onChange={(e) => setNicNumber(e.target.value)} required style={inputStyle} />
                 </div>
 
@@ -325,22 +350,17 @@ export default function GalaxyRides3D() {
                   <input type="text" placeholder="https://..." value={idPhotoUrl} onChange={(e) => setIdPhotoUrl(e.target.value)} required style={inputStyle} />
                 </div>
 
-                {/* LIVE CAMERA CAPTURE SECTION */}
+                {/* LIVE CAMERA CAPTURE */}
                 <div>
                   <label style={labelStyle}>2. Live Face Scan (Live Camera Required)</label>
-
                   {!isCameraActive && !liveFacePhoto && (
-                    <button type="button" onClick={startLiveCamera} style={{ ...primaryBtn, background: "#0284c7" }}>
-                      📷 Open Live Camera
-                    </button>
+                    <button type="button" onClick={startLiveCamera} style={{ ...primaryBtn, background: "#0284c7" }}>📷 Open Live Camera</button>
                   )}
 
                   {isCameraActive && (
                     <div style={{ textAlign: "center", marginTop: "10px" }}>
                       <video ref={videoRef} autoPlay playsInline style={{ width: "100%", maxHeight: "250px", borderRadius: "8px", border: "2px solid #38bdf8" }} />
-                      <button type="button" onClick={captureLivePhoto} style={{ ...primaryBtn, background: "#16a34a", marginTop: "10px" }}>
-                        📸 Snap Photo
-                      </button>
+                      <button type="button" onClick={captureLivePhoto} style={{ ...primaryBtn, background: "#16a34a", marginTop: "10px" }}>📸 Snap Photo</button>
                     </div>
                   )}
 
@@ -348,12 +368,10 @@ export default function GalaxyRides3D() {
 
                   {liveFacePhoto && (
                     <div style={{ marginTop: "10px", textAlign: "center" }}>
-                      <p style={{ fontSize: "0.8rem", color: "#4ade80" }}>✅ Live Face Scan Captured Successfully!</p>
-                      <img src={liveFacePhoto} alt="Live Captured Selfie" style={{ width: "120px", height: "120px", borderRadius: "50%", objectFit: "cover", border: "3px solid #22c55e" }} />
+                      <p style={{ fontSize: "0.8rem", color: "#4ade80" }}>✅ Live Face Scan Captured!</p>
+                      <img src={liveFacePhoto} alt="Live Captured Selfie" style={{ width: "100px", height: "100px", borderRadius: "50%", objectFit: "cover", border: "3px solid #22c55e" }} />
                       <br />
-                      <button type="button" onClick={() => { setLiveFacePhoto(null); startLiveCamera(); }} style={{ fontSize: "0.75rem", background: "transparent", color: "#38bdf8", border: "none", cursor: "pointer", marginTop: "6px" }}>
-                        🔄 Retake Scan
-                      </button>
+                      <button type="button" onClick={() => { setLiveFacePhoto(null); startLiveCamera(); }} style={{ fontSize: "0.75rem", background: "transparent", color: "#38bdf8", border: "none", cursor: "pointer", marginTop: "6px" }}>🔄 Retake</button>
                     </div>
                   )}
                 </div>
@@ -364,7 +382,6 @@ export default function GalaxyRides3D() {
                     <option value="Sedan / Hybrid Car">Sedan / Hybrid Car</option>
                     <option value="Small Car / Alto / Nano">Small Car / Alto / Nano</option>
                     <option value="Van / Mini Bus / Coaster">Van / Mini Bus / Coaster</option>
-                    <option value="Motorcycle / Bike">Motorcycle / Bike</option>
                   </select>
                 </div>
 
@@ -375,62 +392,60 @@ export default function GalaxyRides3D() {
                 )}
 
                 <button type="submit" disabled={isAiVerifying || !liveFacePhoto} style={{ ...primaryBtn, background: "#16a34a" }}>
-                  {isAiVerifying ? "AI Matching..." : "Verify & Become Driver"}
+                  {isAiVerifying ? "AI Verifying..." : "Verify & Become Driver ✅"}
                 </button>
               </form>
             </div>
           ) : (
-            /* VERIFIED DRIVER DASHBOARD & MAP ROUTE POSTING */
-            <div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-                <div style={cardStyle}>
-                  <h3 style={{ color: "#38bdf8", marginTop: 0 }}>🚗 Publish Live Route</h3>
+            /* TAB 2: MAIN DASHBOARD & RIDE POSTING */
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              <div style={cardStyle}>
+                <h3 style={{ color: "#38bdf8", marginTop: 0 }}>🚗 Ride Route Publisher</h3>
 
-                  <div style={{ marginBottom: "12px" }}>
-                    <label style={labelStyle}>Start Location</label>
-                    <input type="text" value={startQuery} onChange={(e) => { setStartQuery(e.target.value); fetchSuggestions(e.target.value, setStartSuggestions); }} style={inputStyle} />
-                    {startSuggestions.length > 0 && (
-                      <div style={suggestBox}>
-                        {startSuggestions.map((s, idx) => (
-                          <div key={idx} onClick={() => { setStartCoords([parseFloat(s.lat), parseFloat(s.lon)]); setStartQuery(s.display_name); setStartSuggestions([]); }} style={suggestItem}>
-                            📍 {s.display_name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                {currentUser.isVerifiedDriver ? (
+                  <>
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={labelStyle}>Start Location</label>
+                      <input type="text" value={startQuery} onChange={(e) => { setStartQuery(e.target.value); fetchSuggestions(e.target.value, setStartSuggestions); }} style={inputStyle} />
+                    </div>
+
+                    <div style={{ marginBottom: "12px" }}>
+                      <label style={labelStyle}>End Destination</label>
+                      <input type="text" value={endQuery} onChange={(e) => { setEndQuery(e.target.value); fetchSuggestions(e.target.value, setEndSuggestions); }} style={inputStyle} />
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
+                      <input type="text" value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="Vehicle Model" style={inputStyle} />
+                      <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} placeholder="Price LKR" style={inputStyle} />
+                    </div>
+
+                    <button onClick={handlePublishRide} style={primaryBtn}>🚀 Publish Route Live</button>
+                  </>
+                ) : (
+                  <div style={{ padding: "15px", background: "#0f172a", borderRadius: "8px", textAlign: "center" }}>
+                    <p style={{ fontSize: "0.9rem", color: "#94a3b8" }}>ඔබ තවමත් Verified Driver කෙනෙක් නොවේ. Ride එකක් Publish කිරීමට පළමුව Driver KYC Verification එක සම්පූර්ණ කරන්න.</p>
+                    <button onClick={() => setCurrentTab("kyc")} style={{ ...primaryBtn, background: "#0284c7" }}>🪪 Fill Driver KYC</button>
                   </div>
+                )}
 
-                  <div style={{ marginBottom: "12px" }}>
-                    <label style={labelStyle}>End Destination</label>
-                    <input type="text" value={endQuery} onChange={(e) => { setEndQuery(e.target.value); fetchSuggestions(e.target.value, setEndSuggestions); }} style={inputStyle} />
-                    {endSuggestions.length > 0 && (
-                      <div style={suggestBox}>
-                        {endSuggestions.map((s, idx) => (
-                          <div key={idx} onClick={() => { setEndCoords([parseFloat(s.lat), parseFloat(s.lon)]); setEndQuery(s.display_name); setEndSuggestions([]); }} style={suggestItem}>
-                            🏁 {s.display_name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                {/* Published Rides List */}
+                <h4 style={{ color: "#38bdf8", marginTop: "20px" }}>📢 Active Rides</h4>
+                {ridePosts.map((ride) => (
+                  <div key={ride.id} style={{ background: "#0f172a", padding: "10px", borderRadius: "8px", marginBottom: "8px", border: "1px solid #334155" }}>
+                    <strong>{ride.driverName}</strong> {ride.isVerifiedDriver && <span style={{ color: "#22c55e", fontSize: "0.8rem" }}>Verified Driver ✅</span>}
+                    <p style={{ margin: "4px 0", fontSize: "0.85rem", color: "#cbd5e1" }}>📍 {ride.startName} ➡️ 🏁 {ride.endName}</p>
+                    <span style={{ color: "#38bdf8", fontWeight: "bold" }}>LKR {ride.price}</span>
                   </div>
+                ))}
+              </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
-                    <input type="text" value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="Vehicle Model" style={inputStyle} />
-                    <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} placeholder="Price LKR" style={inputStyle} />
-                  </div>
-
-                  <button onClick={handlePublishRide} style={primaryBtn}>🚀 Publish Route Live</button>
-                </div>
-
-                {/* LEAFLET MAP */}
-                <div style={{ height: "420px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
-                  <MapContainer bounds={mapBounds} style={{ height: "100%", width: "100%" }}>
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                    <Marker position={startCoords}><Popup>🟢 Start</Popup></Marker>
-                    <Marker position={endCoords}><Popup>🔴 End</Popup></Marker>
-                    {roadRoute.length > 0 && <Polyline positions={roadRoute} pathOptions={{ color: "#2563eb", weight: 5 }} />}
-                  </MapContainer>
-                </div>
+              {/* Map */}
+              <div style={{ height: "450px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
+                <MapContainer bounds={mapBounds} style={{ height: "100%", width: "100%" }}>
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <Marker position={startCoords}><Popup>🟢 Start</Popup></Marker>
+                  <Marker position={endCoords}><Popup>🔴 End</Popup></Marker>
+                </MapContainer>
               </div>
             </div>
           )}
@@ -449,5 +464,3 @@ const labelStyle = { fontSize: "0.85rem", color: "#cbd5e1", display: "block", ma
 const primaryBtn = { width: "100%", padding: "12px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold" as const, cursor: "pointer" };
 const navStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "#1e293b", padding: "12px 20px", borderRadius: "10px", border: "1px solid #334155" };
 const langBtn = (active: boolean) => ({ padding: "6px 12px", background: active ? "#0284c7" : "#334155", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" });
-const suggestBox = { background: "#0f172a", border: "1px solid #38bdf8", borderRadius: "6px", marginTop: "4px", maxHeight: "150px", overflowY: "auto" as const };
-const suggestItem = { padding: "8px", fontSize: "0.85rem", cursor: "pointer", borderBottom: "1px solid #1e293b" };
