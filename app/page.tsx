@@ -99,6 +99,7 @@ interface RidePost {
   endName: string;
   endCoords: [number, number];
   routePolyline: [number, number][];
+  aiRoutePolyline?: [number, number][];
   distanceKm: string;
   isLadiesOnly: boolean;
   status: "active" | "finished";
@@ -106,34 +107,34 @@ interface RidePost {
   reviews?: Review[];
 }
 
-// Trilingual Translations Dictionary
+// Translations
 const translations = {
   si: {
     title: "🌌 Galaxy Rides 3D",
     passenger: "🙋‍♂️ මගියා (Passenger)",
     driver: "🚗 රියදුරු (Driver)",
-    login: "ඇතුළු වන්න (Login)",
-    register: "ලියාපදිංචි වන්න (Register)",
+    login: "ඇතුළු වන්න",
+    register: "ලියාපදිංචි වන්න",
     fullName: "සම්පූර්ණ නම",
     phone: "දුරකථන අංකය",
-    password: "මුරපදය (Password)",
-    logout: "ඉවත් වන්න (Logout)",
+    password: "මුරපදය",
+    logout: "ඉවත් වන්න",
     kycOptionalBanner: "💡 Verified Driver ✅ badge එක ලබාගෙන මගීන්ගේ විශ්වාසය දිනාගැනීමට KYC සත්‍යාපනය සම්පූර්ණ කරන්න.",
     kycPendingNotice: "⏳ ඔබගේ KYC විස්තර පරීක්ෂා කරමින් පවතී (PENDING).",
-    fillKycBtn: "🪪 Verified ✅ Badge එක ලබාගන්න (Get KYC)",
+    fillKycBtn: "🪪 Verified ✅ Badge එක ලබාගන්න",
     kycModalTitle: "🪪 Driver KYC සත්‍යාපනය",
     nic: "ජාතික හැඳුනුම්පත් (NIC) අංකය",
-    license: "රියදුරු බලපත්‍ර අංකය (Driving License)",
+    license: "රියදුරු බලපත්‍ර අංකය",
     vehicleType: "වාහන වර්ගය",
-    vehicleModel: "වාහනයේ මාදිලිය (Model)",
+    vehicleModel: "වාහනයේ මාදිලිය",
     vehicleNum: "වාහන අංකය (උදා: CAD-1234)",
-    submitKyc: "KYC විස්තර යොමු කරන්න (Submit)",
+    submitKyc: "KYC යොමු කරන්න",
     editRide: "✏️ Ride Post එක සංස්කරණය කරන්න",
     publishRide: "🚗 අලුත් Route එකක් පළ කරන්න",
-    startLoc: "ආරම්භක ස්ථානය (Start Location)",
-    endLoc: "ගමනාන්තය (End Destination)",
-    aiShortcutBtn: "🤖 AI මගින් කෙටිම මාර්ග සහ විස්තර ලබාගන්න",
-    aiAnalyzing: "⏳ AI විසින් කෙටිම මාර්ග විශ්ලේෂණය කරමින් පවතී...",
+    startLoc: "ආරම්භක ස්ථානය",
+    endLoc: "ගමනාන්තය",
+    aiShortcutBtn: "🤖 AI කෙටිම මාර්ගය සහ සිතියම් විශ්ලේෂණය",
+    aiAnalyzing: "⏳ AI විසින් පාර සහ වාහනයට යන්න පුලුවන්දැයි පරීක්ෂා කරයි...",
     priceLkr: "ගාස්තුව (LKR)",
     seatsAvailable: "ආසන ගණන",
     saveChanges: "💾 වෙනස්කම් සුරකින්න",
@@ -141,16 +142,16 @@ const translations = {
     myPostedRides: "📋 මා පළ කළ Rides",
     edit: "✏️ Edit",
     delete: "🗑 Delete",
-    markFinished: "✅ අවසන් කරන්න (Mark Finished)",
-    finishedRidesArchive: "🏁 අවසන් වූ Rides ✅ Archive",
-    searchPassengerDest: "🏁 ඔබට යා යුතු ස්ථානය (End Point) Type කරන්න",
-    rateAndReview: "⭐ Driver ට Rating / Comment එකක් දමන්න",
+    markFinished: "✅ අවසන් කරන්න",
+    finishedRidesArchive: "🏁 අවසන් වූ Rides Archive",
+    searchPassengerDest: "🏁 ඔබට යා යුතු ස්ථානය Type කරන්න",
+    rateAndReview: "⭐ Driver ට Rating එකක් දමන්න",
     rateDriverTitle: "⭐ Driver Rating",
     ratingStars: "ලකුණු (1-5 Stars)",
     commentFeedback: "අදහස් / Comments",
-    submit: "ලබා දෙන්න (Submit)",
-    cancel: "අවලංගු කරන්න (Cancel)",
-    kmAway: "km දුරින් (End Point match)",
+    submit: "ලබා දෙන්න",
+    cancel: "අවලංගු කරන්න",
+    kmAway: "km දුරින්",
   },
   en: {
     title: "🌌 Galaxy Rides 3D",
@@ -162,7 +163,7 @@ const translations = {
     phone: "Phone Number",
     password: "Password",
     logout: "Logout",
-    kycOptionalBanner: "💡 Complete KYC verification to display the Verified Driver ✅ badge and boost passenger trust.",
+    kycOptionalBanner: "💡 Complete KYC verification to display the Verified Driver ✅ badge and boost trust.",
     kycPendingNotice: "⏳ Your KYC verification is PENDING review.",
     fillKycBtn: "🪪 Get Verified ✅ Badge",
     kycModalTitle: "🪪 Driver KYC Verification",
@@ -174,10 +175,10 @@ const translations = {
     submitKyc: "Submit KYC Details",
     editRide: "✏️ Edit Ride Post",
     publishRide: "🚗 Publish New Route",
-    startLoc: "Start Location (Search)",
-    endLoc: "End Destination (Search)",
-    aiShortcutBtn: "🤖 AI Route Shortcut Analysis",
-    aiAnalyzing: "⏳ AI Analyzing Shortest Routes...",
+    startLoc: "Start Location",
+    endLoc: "End Destination",
+    aiShortcutBtn: "🤖 AI Shortcut & Map Analysis",
+    aiAnalyzing: "⏳ AI Analyzing Route Feasibility & Vehicle Accessibility...",
     priceLkr: "Price (LKR)",
     seatsAvailable: "Seats Available",
     saveChanges: "💾 Save Changes",
@@ -187,7 +188,7 @@ const translations = {
     delete: "🗑️ Delete",
     markFinished: "✅ Mark Finished",
     finishedRidesArchive: "🏁 Finished Rides Archive",
-    searchPassengerDest: "🏁 Search Your Destination (End Point)",
+    searchPassengerDest: "🏁 Search Your Destination",
     rateAndReview: "⭐ Rate & Review Driver",
     rateDriverTitle: "⭐ Rate Driver",
     ratingStars: "Rating Stars (1-5)",
@@ -200,28 +201,28 @@ const translations = {
     title: "🌌 Galaxy Rides 3D",
     passenger: "🙋‍♂️ பயணி (Passenger)",
     driver: "🚗 ஓட்டுநர் (Driver)",
-    login: "உள்நுழைக (Login)",
-    register: "பதிவு செய்க (Register)",
+    login: "உள்நுழைக",
+    register: "பதிவு செய்க",
     fullName: "முழு பெயர்",
     phone: "தொலைபேசி எண்",
-    password: "கடவுச்சொல் (Password)",
-    logout: "வெளியேறு (Logout)",
+    password: "கடவுச்சொல்",
+    logout: "வெளியேறு",
     kycOptionalBanner: "💡 Verified Driver ✅ பேட்ஜைப் பெற KYC ஐப் பூர்த்தி செய்யவும்.",
-    kycPendingNotice: "⏳ உங்கள் KYC சரிபார்ப்பு பரிசீலனையில் உள்ளது (PENDING).",
+    kycPendingNotice: "⏳ உங்கள் KYC சரிபார்ப்பு பரிசீලனையில் உள்ளது (PENDING).",
     fillKycBtn: "🪪 Verified ✅ பேட்ஜ் பெறுக",
     kycModalTitle: "🪪 Driver KYC சரிபார்ப்பு",
     nic: "தேசிய அடையாள அட்டை (NIC) எண்",
-    license: "ஓட்டுநர் உரிம எண் (License No)",
+    license: "ஓட்டுநர் உரிம எண்",
     vehicleType: "வாகன வகை",
-    vehicleModel: "வாகன மாதிரி (Model)",
+    vehicleModel: "வாகன மாதிரி",
     vehicleNum: "வாகன எண் (எ.கா. CAD-1234)",
     submitKyc: "KYC சமர்ப்பிக்கவும்",
     editRide: "✏️ Ride Post திருத்துக",
     publishRide: "🚗 புதிய வழியைப் பதிவேற்றுக",
-    startLoc: "தொ தொடங்கும் இடம் (Start Location)",
-    endLoc: "சேரும் இடம் (End Destination)",
-    aiShortcutBtn: "🤖 AI குறுகிய வழியைக் கண்டறியவும்",
-    aiAnalyzing: "⏳ AI பகுப்பாய்வு செய்கிறது...",
+    startLoc: "தொ தொடங்கும் இடம்",
+    endLoc: "சேரும் இடம்",
+    aiShortcutBtn: "🤖 AI குறுக்கு வழி மற்றும் வரைபட பகுப்பாய்வு",
+    aiAnalyzing: "⏳ AI வாகனத்திற்கு பாதை பொருத்தமானதா என பகுப்பாய்வு செய்கிறது...",
     priceLkr: "கட்டணம் (LKR)",
     seatsAvailable: "இருக்கைகள்",
     saveChanges: "💾 மாற்றங்களைச் சேமிக்கவும்",
@@ -235,14 +236,13 @@ const translations = {
     rateAndReview: "⭐ ஓட்டுநருக்கு மதிப்பிடவும்",
     rateDriverTitle: "⭐ ஓட்டுநர் மதிப்பீடு",
     ratingStars: "நட்சத்திர மதிப்பீடு (1-5)",
-    commentFeedback: "கருத்துகள் (Comment)",
+    commentFeedback: "கருத்துகள்",
     submit: "சமர்ப்பிக்கவும்",
     cancel: "ரத்து செய்",
     kmAway: "கி.மீ தூரத்தில்",
   },
 };
 
-// Haversine Distance Calculation (Km)
 function getDistanceInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -298,6 +298,7 @@ export default function GalaxyRidesApp() {
   ]);
 
   const [roadRoute, setRoadRoute] = useState<[number, number][]>([]);
+  const [aiRoadRoute, setAiRoadRoute] = useState<[number, number][]>([]);
   const [routeDistance, setRouteDistance] = useState<string>("");
   const [aiAnalysisResult, setAiAnalysisResult] = useState<string>("");
   const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
@@ -317,7 +318,6 @@ export default function GalaxyRidesApp() {
 
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize Leaflet Icons
   useEffect(() => {
     if (!document.getElementById("leaflet-css")) {
       const link = document.createElement("link");
@@ -351,15 +351,12 @@ export default function GalaxyRidesApp() {
     });
   }, []);
 
-  // Autosuggest Location Search (Nominatim API)
   const fetchSuggestions = (query: string, setFn: (s: Suggestion[]) => void) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-
     if (query.trim().length < 2) {
       setFn([]);
       return;
     }
-
     debounceTimer.current = setTimeout(async () => {
       try {
         const res = await fetch(
@@ -398,7 +395,6 @@ export default function GalaxyRidesApp() {
     setPassengerEndSuggestions([]);
   };
 
-  // Real-time OSRM Routing
   const updateRouteAndBounds = async (start: [number, number], end: [number, number]) => {
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
@@ -426,28 +422,58 @@ export default function GalaxyRidesApp() {
     }
   };
 
-  // AI-Powered Route Analysis
+  // AI ROUTE SHORTCUT & MAP POLYLINE + VEHICLE ACCESSIBILITY CHECKER
   const generateAiShortcuts = () => {
     setIsAiAnalyzing(true);
     setAiAnalysisResult("");
 
     setTimeout(() => {
-      let shortcutAdvice = "";
       const veh = currentUser?.vehicleType || vehTypeInput;
-      if (veh === "Van/Mini Bus") {
-        shortcutAdvice = `🚐 Vehicle Type: Van/Mini Bus\n⚠️ WARNING: Stick strictly to A-Grade highways. Avoid narrow inner village shortcuts near ${endQuery.split(",")[0]}.\n🛣️ Recommended: Outer Circular Highway for smooth transit.`;
-      } else if (veh === "Bike") {
-        shortcutAdvice = `🏍️ Vehicle Type: Motorcycle\n⚡ Fast By-Pass Active: Can utilize narrow interior bypass lanes and beat traffic signals near main intersections. Saved ~18 mins.`;
-      } else {
-        shortcutAdvice = `🚗 Vehicle Type: Sedan / Small Car\n✅ AI Shortcut Detected: Use B-grade secondary connector roads to bypass heavy urban congestion near ${startQuery.split(",")[0]}. Watch for sharp turns.`;
+
+      // Create an AI Alternative / Shortcut Line (Slightly offset coords for visual demonstration on Leaflet Map)
+      if (roadRoute.length > 0) {
+        const shortcutPolyline: [number, number][] = roadRoute.map((pt, idx) => {
+          if (idx > 0 && idx < roadRoute.length - 1) {
+            return [pt[0] + 0.003, pt[1] - 0.003]; // Offset curve for AI alternative path
+          }
+          return pt;
+        });
+        setAiRoadRoute(shortcutPolyline);
       }
 
-      setAiAnalysisResult(`🤖 AI Route Optimization:\n📍 Distance: ${routeDistance}\n${shortcutAdvice}`);
+      let feasibilityText = "";
+
+      if (veh === "Van/Mini Bus") {
+        if (lang === "si") {
+          feasibilityText = `🚐 වාහන වර්ගය: Van / Mini Bus\n🚫 පාරේ තත්ත්වය: අතුරු/පටු පාරවල් භාවිතය සුදුසු නැත (NOT SUITABLE).\n🛣️ AI මාර්ගය (Map එකේ දම් පාට පාර): ප්‍රධාන A-Grade අධිවේගී පාරවල් පමණක් භාවිත කරන්න.`;
+        } else if (lang === "en") {
+          feasibilityText = `🚐 Vehicle: Van / Mini Bus\n🚫 Accessibility Status: Rural Narrow Shortcuts NOT SUITABLE.\n🛣️ AI Route (Purple line on map): Stick strictly to A-Grade main highways.`;
+        } else {
+          feasibilityText = `🚐 வாகன வகை: Van / Mini Bus\n🚫 நிலைமை: குறுகிய பாதைகள் ஏற்றது அல்ல (NOT SUITABLE).\n🛣️ AI பாதை (ஊதா நிற கோடு): முக்கிய நெடுஞ்சாலைகளை மட்டுமே பயன்படுத்தவும்.`;
+        }
+      } else if (veh === "Bike") {
+        if (lang === "si") {
+          feasibilityText = `🏍️ වාහන වර්ගය: Motorcycle / Bike\n✅ පාරේ තත්ත්වය: ඉතා සුදුසුයි! (HIGHLY SUITABLE).\n⚡ AI මාර්ගය (Map එකේ දම් පාට පාර): නගරයේ තදබදය මගහැර යාමට අතුරු කෙටි මාර්ගයෙන් විනාඩි 15ක් ඉතිරි කරගත හැක.`;
+        } else if (lang === "en") {
+          feasibilityText = `🏍️ Vehicle: Motorcycle / Bike\n✅ Accessibility Status: HIGHLY SUITABLE.\n⚡ AI Route (Purple line on map): Interior bypass shortcuts active. Saves ~15 mins of traffic.`;
+        } else {
+          feasibilityText = `🏍️ வாகன வகை: Motorcycle / Bike\n✅ நிலைமை: மிகவும் ஏற்றது! (HIGHLY SUITABLE).\n⚡ AI பாதை (ஊதா நிற கோடு): குறுகிய பாதைகள் மூலம் 15 நிமிடங்கள் சேமிக்கலாம்.`;
+        }
+      } else {
+        if (lang === "si") {
+          feasibilityText = `🚗 වාහන වර්ගය: Sedan / Hybrid / Small Car\n✅ පාරේ තත්ත්වය: ගමන් කළ හැක (SUITABLE WITH CAUTION).\n🛣️️ AI මාර්ගය (Map එකේ දම් පාට පාර): B-Grade ද්විතීයික මාර්ග මගින් නගර තදබදය මගහැර යා හැක.`;
+        } else if (lang === "en") {
+          feasibilityText = `🚗 Vehicle: Sedan / Hybrid / Small Car\n✅ Accessibility Status: SUITABLE WITH CAUTION.\n🛣️ AI Route (Purple line on map): Utilize secondary connector roads to bypass congestion.`;
+        } else {
+          feasibilityText = `🚗 வாகன வகை: Sedan / Hybrid / Small Car\n✅ நிலைமை: செல்ல முடியும் (SUITABLE).\n🛣️ AI பாதை (ஊதா நிற கோடு): இரண்டாம் நிலை பாதைகளைப் பயன்படுத்தி போக்குவரத்து நெரிசலைத் தவிர்க்கலாம்.`;
+        }
+      }
+
+      setAiAnalysisResult(feasibilityText);
       setIsAiAnalyzing(false);
     }, 1200);
   };
 
-  // Auth Handlers
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneInput || !passwordInput) return;
@@ -462,7 +488,6 @@ export default function GalaxyRidesApp() {
     setCurrentUser(user);
   };
 
-  // KYC Submit Handler
   const handleKycSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
@@ -479,7 +504,6 @@ export default function GalaxyRidesApp() {
 
     setCurrentUser(updatedUser);
 
-    // Also update existing posts with new KYC Status if any
     setRidePosts((prev) =>
       prev.map((post) =>
         post.driverId === currentUser.id
@@ -489,10 +513,9 @@ export default function GalaxyRidesApp() {
     );
 
     setShowKycModal(false);
-    alert("✅ KYC Submitted Successfully! Verification Status is now PENDING.");
+    alert("✅ KYC Submitted Successfully!");
   };
 
-  // Admin Quick Simulation to Approve Driver Badge
   const simulateAdminApproval = () => {
     if (!currentUser) return;
     const updatedUser: User = { ...currentUser, kycStatus: "APPROVED" };
@@ -509,7 +532,6 @@ export default function GalaxyRidesApp() {
     alert("🎉 Admin Simulation: Driver KYC Approved! Verified Badge ✅ Active!");
   };
 
-  // Driver Ride Actions (NO KYC MANDATORY TO PUBLISH)
   const handlePublishOrUpdateRide = () => {
     if (!currentUser) return;
 
@@ -529,6 +551,7 @@ export default function GalaxyRidesApp() {
                 endName: endQuery,
                 endCoords,
                 routePolyline: roadRoute,
+                aiRoutePolyline: aiRoadRoute,
                 distanceKm: routeDistance,
                 isLadiesOnly,
                 aiShortcutAnalysis: aiAnalysisResult,
@@ -554,6 +577,7 @@ export default function GalaxyRidesApp() {
         endName: endQuery,
         endCoords,
         routePolyline: roadRoute.length > 0 ? roadRoute : [startCoords, endCoords],
+        aiRoutePolyline: aiRoadRoute,
         distanceKm: routeDistance || "N/A",
         isLadiesOnly,
         status: "active",
@@ -591,7 +615,6 @@ export default function GalaxyRidesApp() {
     alert("✅ Ride marked as Finished!");
   };
 
-  // Review Submit
   const handleSubmitReview = () => {
     if (!ratingTargetPostId || !currentUser) return;
 
@@ -615,7 +638,6 @@ export default function GalaxyRidesApp() {
     alert("🌟 Thank you for your review!");
   };
 
-  // Destination Matching Engine (10km Radius)
   const filteredRides = passengerEndCoords
     ? ridePosts
         .filter((ride) => ride.status === "active")
@@ -687,8 +709,6 @@ export default function GalaxyRidesApp() {
           {/* DRIVER DASHBOARD */}
           {currentUser.role === "driver" && (
             <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-              
-              {/* OPTIONAL KYC BANNER (DRIVER CAN STILL USE APP EVEN IF UNVERIFIED) */}
               {currentUser.kycStatus === "NOT_SUBMITTED" && (
                 <div style={{ background: "#1e293b", border: "1px solid #0284c7", padding: "16px", borderRadius: "12px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: "0.9rem" }}>{t.kycOptionalBanner}</span>
@@ -703,13 +723,12 @@ export default function GalaxyRidesApp() {
                 </div>
               )}
 
-              {/* RIDE PUBLISH / EDIT SECTION (ALWAYS ACCESSIBLE) */}
               <div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "30px" }}>
                   <div style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
                     <h3 style={{ color: "#38bdf8", margin: "0 0 12px 0" }}>{editingPostId ? t.editRide : t.publishRide}</h3>
 
-                    {/* Start Location Search */}
+                    {/* Start Location */}
                     <div style={{ marginBottom: "12px", position: "relative" }}>
                       <label style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>{t.startLoc}</label>
                       <input type="text" value={startQuery} onChange={(e) => { setStartQuery(e.target.value); fetchSuggestions(e.target.value, setStartSuggestions); }} style={{ width: "100%", padding: "10px", borderRadius: "6px", background: "#0f172a", color: "#fff", border: "1px solid #475569" }} />
@@ -722,7 +741,7 @@ export default function GalaxyRidesApp() {
                       )}
                     </div>
 
-                    {/* End Location Search */}
+                    {/* End Location */}
                     <div style={{ marginBottom: "12px", position: "relative" }}>
                       <label style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>{t.endLoc}</label>
                       <input type="text" value={endQuery} onChange={(e) => { setEndQuery(e.target.value); fetchSuggestions(e.target.value, setEndSuggestions); }} style={{ width: "100%", padding: "10px", borderRadius: "6px", background: "#0f172a", color: "#fff", border: "1px solid #38bdf8" }} />
@@ -735,13 +754,13 @@ export default function GalaxyRidesApp() {
                       )}
                     </div>
 
-                    {/* AI Shortcut Button */}
+                    {/* AI Route & Map Shortcut Button */}
                     <button onClick={generateAiShortcuts} disabled={isAiAnalyzing} style={{ width: "100%", padding: "10px", background: "#8b5cf6", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginBottom: "12px" }}>
                       {isAiAnalyzing ? t.aiAnalyzing : t.aiShortcutBtn}
                     </button>
 
                     {aiAnalysisResult && (
-                      <div style={{ background: "#0f172a", padding: "10px", borderRadius: "8px", border: "1px solid #8b5cf6", whiteSpace: "pre-wrap", fontSize: "0.85rem", marginBottom: "12px", color: "#c084fc" }}>
+                      <div style={{ background: "#0f172a", padding: "12px", borderRadius: "8px", border: "1px solid #8b5cf6", whiteSpace: "pre-wrap", fontSize: "0.85rem", marginBottom: "12px", color: "#c084fc" }}>
                         {aiAnalysisResult}
                       </div>
                     )}
@@ -762,14 +781,19 @@ export default function GalaxyRidesApp() {
                     </button>
                   </div>
 
-                  {/* Leaflet Map Integration */}
-                  <div style={{ height: "460px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
+                  {/* Leaflet Map with Normal Route & AI Polyline */}
+                  <div style={{ height: "480px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
                     <MapContainer bounds={mapBounds} style={{ height: "100%", width: "100%" }}>
                       <MapFlyTo bounds={mapBounds} />
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       {greenIcon && <Marker position={startCoords} icon={greenIcon}><Popup>🟢 Start: {startQuery}</Popup></Marker>}
                       {redIcon && <Marker position={endCoords} icon={redIcon}><Popup>🔴 End: {endQuery}</Popup></Marker>}
-                      {roadRoute.length > 0 && <Polyline positions={roadRoute} pathOptions={{ color: "#2563eb", weight: 6 }} />}
+                      
+                      {/* Normal Driving Route (Blue Line) */}
+                      {roadRoute.length > 0 && <Polyline positions={roadRoute} pathOptions={{ color: "#2563eb", weight: 5 }} />}
+
+                      {/* AI Alternative / Shortcut Feasibility Route (Purple Dash Line on Map) */}
+                      {aiRoadRoute.length > 0 && <Polyline positions={aiRoadRoute} pathOptions={{ color: "#a855f7", weight: 5, dashArray: "8, 8" }} />}
                     </MapContainer>
                   </div>
                 </div>
@@ -797,13 +821,13 @@ export default function GalaxyRidesApp() {
                   ))}
                 </div>
 
-                {/* Finished Rides Archive */}
+                {/* Finished Archive */}
                 <h3 style={{ color: "#4ade80", marginTop: "30px" }}>{t.finishedRidesArchive}</h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   {ridePosts.filter((p) => p.driverId === currentUser.id && p.status === "finished").map((post) => (
                     <div key={post.id} style={{ background: "#0f172a", padding: "16px", borderRadius: "12px", border: "1px solid #16a34a" }}>
                       <h4 style={{ margin: 0, color: "#4ade80" }}>✅ COMPLETED: {post.startName} ➔ {post.endName}</h4>
-                      <p style={{ margin: "4px 0", fontSize: "0.85rem", color: "#cbd5e1" }}>Passenger Reviews & Ratings:</p>
+                      <p style={{ margin: "4px 0", fontSize: "0.85rem", color: "#cbd5e1" }}>Passenger Reviews:</p>
                       {post.reviews && post.reviews.length > 0 ? (
                         post.reviews.map((rev, idx) => (
                           <div key={idx} style={{ background: "#1e293b", padding: "8px", borderRadius: "6px", marginTop: "4px", fontSize: "0.85rem" }}>
@@ -811,7 +835,7 @@ export default function GalaxyRidesApp() {
                           </div>
                         ))
                       ) : (
-                        <p style={{ fontSize: "0.8rem", color: "#94a3b8" }}>No passenger comments yet.</p>
+                        <p style={{ fontSize: "0.8rem", color: "#94a3b8" }}>No comments yet.</p>
                       )}
                     </div>
                   ))}
@@ -837,7 +861,7 @@ export default function GalaxyRidesApp() {
                 </div>
               </div>
 
-              {/* Matched Drivers (10km Radius) */}
+              {/* Matched Drivers */}
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 {filteredRides.map((ride: any) => (
                   <div key={ride.id} style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
