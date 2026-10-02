@@ -89,6 +89,7 @@ interface RidePost {
   driverId: string;
   driverName: string;
   driverPhone: string;
+  driverKycStatus: KycStatus;
   vehicle: string;
   vehicleCategory: "Small Car/Nano" | "Sedan/Prius" | "Van/Mini Bus" | "Bike";
   seats: number;
@@ -117,10 +118,9 @@ const translations = {
     phone: "දුරකථන අංකය",
     password: "මුරපදය (Password)",
     logout: "ඉවත් වන්න (Logout)",
-    kycWarning: "⚠️ ඔබ තවමත් Verified Driver කෙනෙක් නොවේ. Ride එකක් පළ කිරීමට පෙර ඔබගේ KYC තොරතුරු ලබා දී තහවුරු කරගන්න.",
-    kycPendingNotice: "⏳ ඔබගේ KYC විස්තර පරීක්ෂා කරමින් පවතී (PENDING). පරිපාලක අනුමැතිය ලැබෙන තෙක් රැඳී සිටින්න.",
-    kycRejectedNotice: "❌ ඔබගේ KYC විස්තර ප්‍රතික්ෂේප විය (REJECTED). කරුණාකර නිවැරදි විස්තර නැවත ඇතුළත් කරන්න.",
-    fillKycBtn: "🪪 Driver KYC ලබා දෙන්න",
+    kycOptionalBanner: "💡 Verified Driver ✅ badge එක ලබාගෙන මගීන්ගේ විශ්වාසය දිනාගැනීමට KYC සත්‍යාපනය සම්පූර්ණ කරන්න.",
+    kycPendingNotice: "⏳ ඔබගේ KYC විස්තර පරීක්ෂා කරමින් පවතී (PENDING).",
+    fillKycBtn: "🪪 Verified ✅ Badge එක ලබාගන්න (Get KYC)",
     kycModalTitle: "🪪 Driver KYC සත්‍යාපනය",
     nic: "ජාතික හැඳුනුම්පත් (NIC) අංකය",
     license: "රියදුරු බලපත්‍ර අංකය (Driving License)",
@@ -140,9 +140,9 @@ const translations = {
     publishLive: "🚀 Route එක පළ කරන්න",
     myPostedRides: "📋 මා පළ කළ Rides",
     edit: "✏️ Edit",
-    delete: "🗑️️ Delete",
+    delete: "🗑 Delete",
     markFinished: "✅ අවසන් කරන්න (Mark Finished)",
-    finishedRidesArchive: "🏁 අවසන් වූ Rides ✅ Archive (මකා දැමිය නොහැක)",
+    finishedRidesArchive: "🏁 අවසන් වූ Rides ✅ Archive",
     searchPassengerDest: "🏁 ඔබට යා යුතු ස්ථානය (End Point) Type කරන්න",
     rateAndReview: "⭐ Driver ට Rating / Comment එකක් දමන්න",
     rateDriverTitle: "⭐ Driver Rating",
@@ -162,10 +162,9 @@ const translations = {
     phone: "Phone Number",
     password: "Password",
     logout: "Logout",
-    kycWarning: "⚠️ You are not a Verified Driver yet. Please complete your KYC verification to publish rides.",
-    kycPendingNotice: "⏳ Your KYC verification is PENDING review. Please wait for approval.",
-    kycRejectedNotice: "❌ Your KYC verification was REJECTED. Please re-submit valid details.",
-    fillKycBtn: "🪪 Fill Driver KYC",
+    kycOptionalBanner: "💡 Complete KYC verification to display the Verified Driver ✅ badge and boost passenger trust.",
+    kycPendingNotice: "⏳ Your KYC verification is PENDING review.",
+    fillKycBtn: "🪪 Get Verified ✅ Badge",
     kycModalTitle: "🪪 Driver KYC Verification",
     nic: "NIC Number",
     license: "Driving License Number",
@@ -187,7 +186,7 @@ const translations = {
     edit: "✏️ Edit",
     delete: "🗑️ Delete",
     markFinished: "✅ Mark Finished",
-    finishedRidesArchive: "🏁 Finished Rides Archive (Non-deletable)",
+    finishedRidesArchive: "🏁 Finished Rides Archive",
     searchPassengerDest: "🏁 Search Your Destination (End Point)",
     rateAndReview: "⭐ Rate & Review Driver",
     rateDriverTitle: "⭐ Rate Driver",
@@ -207,10 +206,9 @@ const translations = {
     phone: "தொலைபேசி எண்",
     password: "கடவுச்சொல் (Password)",
     logout: "வெளியேறு (Logout)",
-    kycWarning: "⚠️ நீங்கள் இன்னும் சரிபார்க்கப்பட்ட ஓட்டுநர் அல்ல. சவாரிகளைப் பதிவேற்ற KYC ஐப் பூர்த்தி செய்யவும்.",
-    kycPendingNotice: "⏳ உங்கள் KYC சரிபார்ப்பு பரிசீலனையில் உள்ளது (PENDING). ஒப்புதலுக்கு காத்திருக்கவும்.",
-    kycRejectedNotice: "❌ உங்கள் KYC நிராகரிக்கப்பட்டது (REJECTED). தயவுசெய்து சரியான விவரங்களை மீண்டும் சமர்ப்பிக்கவும்.",
-    fillKycBtn: "🪪 Driver KYC பூர்த்தி செய்க",
+    kycOptionalBanner: "💡 Verified Driver ✅ பேட்ஜைப் பெற KYC ஐப் பூர்த்தி செய்யவும்.",
+    kycPendingNotice: "⏳ உங்கள் KYC சரிபார்ப்பு பரிசீலனையில் உள்ளது (PENDING).",
+    fillKycBtn: "🪪 Verified ✅ பேட்ஜ் பெறுக",
     kycModalTitle: "🪪 Driver KYC சரிபார்ப்பு",
     nic: "தேசிய அடையாள அட்டை (NIC) எண்",
     license: "ஓட்டுநர் உரிம எண் (License No)",
@@ -459,7 +457,7 @@ export default function GalaxyRidesApp() {
       name: nameInput || (selectedRole === "driver" ? "Driver User" : "Passenger User"),
       phone: phoneInput,
       role: selectedRole,
-      kycStatus: selectedRole === "driver" ? "NOT_SUBMITTED" : "APPROVED",
+      kycStatus: "NOT_SUBMITTED",
     };
     setCurrentUser(user);
   };
@@ -469,7 +467,7 @@ export default function GalaxyRidesApp() {
     e.preventDefault();
     if (!currentUser) return;
 
-    setCurrentUser({
+    const updatedUser: User = {
       ...currentUser,
       kycStatus: "PENDING",
       nicNumber: nicInput,
@@ -477,21 +475,43 @@ export default function GalaxyRidesApp() {
       vehicleType: vehTypeInput,
       vehicleModel: vehModelInput,
       vehicleNumber: vehNumberInput,
-    });
+    };
+
+    setCurrentUser(updatedUser);
+
+    // Also update existing posts with new KYC Status if any
+    setRidePosts((prev) =>
+      prev.map((post) =>
+        post.driverId === currentUser.id
+          ? { ...post, driverKycStatus: "PENDING" }
+          : post
+      )
+    );
+
     setShowKycModal(false);
     alert("✅ KYC Submitted Successfully! Verification Status is now PENDING.");
   };
 
-  // Admin Quick Simulation to Approve Driver for testing
+  // Admin Quick Simulation to Approve Driver Badge
   const simulateAdminApproval = () => {
     if (!currentUser) return;
-    setCurrentUser({ ...currentUser, kycStatus: "APPROVED" });
-    alert("🎉 Admin Simulation: Driver KYC has been APPROVED!");
+    const updatedUser: User = { ...currentUser, kycStatus: "APPROVED" };
+    setCurrentUser(updatedUser);
+
+    setRidePosts((prev) =>
+      prev.map((post) =>
+        post.driverId === currentUser.id
+          ? { ...post, driverKycStatus: "APPROVED" }
+          : post
+      )
+    );
+
+    alert("🎉 Admin Simulation: Driver KYC Approved! Verified Badge ✅ Active!");
   };
 
-  // Driver Ride Actions
+  // Driver Ride Actions (NO KYC MANDATORY TO PUBLISH)
   const handlePublishOrUpdateRide = () => {
-    if (!currentUser || currentUser.kycStatus !== "APPROVED") return;
+    if (!currentUser) return;
 
     if (editingPostId) {
       setRidePosts((prev) =>
@@ -499,6 +519,7 @@ export default function GalaxyRidesApp() {
           post.id === editingPostId
             ? {
                 ...post,
+                driverKycStatus: currentUser.kycStatus,
                 vehicle: currentUser.vehicleModel || vehModelInput,
                 vehicleCategory: currentUser.vehicleType || vehTypeInput,
                 seats,
@@ -523,6 +544,7 @@ export default function GalaxyRidesApp() {
         driverId: currentUser.id,
         driverName: currentUser.name,
         driverPhone: currentUser.phone,
+        driverKycStatus: currentUser.kycStatus,
         vehicle: currentUser.vehicleModel || vehModelInput,
         vehicleCategory: currentUser.vehicleType || vehTypeInput,
         seats,
@@ -649,9 +671,14 @@ export default function GalaxyRidesApp() {
           {/* Main App Header */}
           <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "#1e293b", padding: "15px 20px", borderRadius: "12px", border: "1px solid #334155" }}>
             <div>
-              <h2 style={{ margin: 0, color: "#38bdf8" }}>{t.title}</h2>
+              <h2 style={{ margin: 0, color: "#38bdf8", display: "flex", alignItems: "center", gap: "8px" }}>
+                {t.title}
+                {currentUser.role === "driver" && currentUser.kycStatus === "APPROVED" && (
+                  <span style={{ fontSize: "0.85rem", background: "#16a34a", color: "#fff", padding: "2px 8px", borderRadius: "12px" }}>Verified Driver ✅</span>
+                )}
+              </h2>
               <p style={{ margin: 0, color: "#94a3b8", fontSize: "0.85rem" }}>
-                {currentUser.name} | Status: <b style={{ color: currentUser.kycStatus === "APPROVED" ? "#4ade80" : "#f59e0b" }}>{currentUser.kycStatus}</b> ({currentUser.role.toUpperCase()})
+                {currentUser.name} ({currentUser.role.toUpperCase()})
               </p>
             </div>
             <button onClick={() => setCurrentUser(null)} style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>{t.logout}</button>
@@ -661,11 +688,11 @@ export default function GalaxyRidesApp() {
           {currentUser.role === "driver" && (
             <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
               
-              {/* KYC ALERT BOX & STATUS NOTICES */}
+              {/* OPTIONAL KYC BANNER (DRIVER CAN STILL USE APP EVEN IF UNVERIFIED) */}
               {currentUser.kycStatus === "NOT_SUBMITTED" && (
-                <div style={{ background: "#7f1d1d", border: "1px solid #ef4444", padding: "16px", borderRadius: "12px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>{t.kycWarning}</span>
-                  <button onClick={() => setShowKycModal(true)} style={{ padding: "10px 16px", background: "#f59e0b", color: "#000", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}>{t.fillKycBtn}</button>
+                <div style={{ background: "#1e293b", border: "1px solid #0284c7", padding: "16px", borderRadius: "12px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.9rem" }}>{t.kycOptionalBanner}</span>
+                  <button onClick={() => setShowKycModal(true)} style={{ padding: "10px 16px", background: "#0284c7", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}>{t.fillKycBtn}</button>
                 </div>
               )}
 
@@ -676,15 +703,8 @@ export default function GalaxyRidesApp() {
                 </div>
               )}
 
-              {currentUser.kycStatus === "REJECTED" && (
-                <div style={{ background: "#7f1d1d", border: "1px solid #ef4444", padding: "16px", borderRadius: "12px", marginBottom: "20px" }}>
-                  <span>{t.kycRejectedNotice}</span>
-                  <button onClick={() => setShowKycModal(true)} style={{ marginLeft: "15px", padding: "8px 12px", background: "#f59e0b", color: "#000", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>{t.fillKycBtn}</button>
-                </div>
-              )}
-
-              {/* RIDE PUBLISH / EDIT SECTION (LOCKED UNLESS KYC APPROVED) */}
-              <div style={{ opacity: currentUser.kycStatus === "APPROVED" ? 1 : 0.4, pointerEvents: currentUser.kycStatus === "APPROVED" ? "auto" : "none" }}>
+              {/* RIDE PUBLISH / EDIT SECTION (ALWAYS ACCESSIBLE) */}
+              <div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "30px" }}>
                   <div style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
                     <h3 style={{ color: "#38bdf8", margin: "0 0 12px 0" }}>{editingPostId ? t.editRide : t.publishRide}</h3>
@@ -760,7 +780,10 @@ export default function GalaxyRidesApp() {
                   {ridePosts.filter((p) => p.driverId === currentUser.id && p.status === "active").map((post) => (
                     <div key={post.id} style={{ background: "#1e293b", padding: "16px", borderRadius: "12px", border: "1px solid #334155", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
-                        <h4 style={{ margin: 0, color: "#38bdf8" }}>{post.startName} ➔ {post.endName}</h4>
+                        <h4 style={{ margin: 0, color: "#38bdf8", display: "flex", alignItems: "center", gap: "6px" }}>
+                          {post.startName} ➔ {post.endName}
+                          {post.driverKycStatus === "APPROVED" && <span style={{ fontSize: "0.75rem", background: "#16a34a", color: "#fff", padding: "2px 6px", borderRadius: "10px" }}>Verified Driver ✅</span>}
+                        </h4>
                         <p style={{ margin: "4px 0", fontSize: "0.85rem", color: "#94a3b8" }}>
                           LKR {post.price} | {post.vehicle} ({post.distanceKm})
                         </p>
@@ -820,7 +843,12 @@ export default function GalaxyRidesApp() {
                   <div key={ride.id} style={{ background: "#1e293b", padding: "20px", borderRadius: "12px", border: "1px solid #334155" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div>
-                        <h4 style={{ margin: 0, color: "#38bdf8" }}>{ride.driverName}</h4>
+                        <h4 style={{ margin: 0, color: "#38bdf8", display: "flex", alignItems: "center", gap: "6px" }}>
+                          {ride.driverName}
+                          {ride.driverKycStatus === "APPROVED" && (
+                            <span style={{ fontSize: "0.75rem", background: "#16a34a", color: "#fff", padding: "2px 6px", borderRadius: "10px" }}>Verified Driver ✅</span>
+                          )}
+                        </h4>
                         <p style={{ margin: "4px 0", fontSize: "0.85rem", color: "#94a3b8" }}>🚗 {ride.vehicle} | 📞 {ride.driverPhone}</p>
                       </div>
                       <span style={{ background: "#16a34a", color: "#fff", padding: "4px 8px", borderRadius: "6px", fontSize: "0.8rem", fontWeight: "bold" }}>
