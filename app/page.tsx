@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import { supabase } from "@/lib/supabase"; // Supabase client setup
 
 // Dynamic Imports for Leaflet (SSR Safety for Next.js)
 const MapContainer = dynamic(
@@ -57,9 +58,11 @@ const MapFlyTo = dynamic(
 // Types
 type Language = "si" | "en" | "ta";
 type AppTab = "carpool" | "rural_taxi";
+type AuthMode = "login" | "register";
 
-interface User {
+interface UserProfile {
   id: string;
+  email: string;
   name: string;
   phone: string;
   nic: string;
@@ -126,15 +129,21 @@ export default function GalaxyRidesApp() {
   const [lang, setLang] = useState<Language>("si");
   const [activeTab, setActiveTab] = useState<AppTab>("carpool");
 
-  // Auth & KYC States
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Auth States
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  // Form Fields
+  const [emailInput, setEmailInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
   const [selectedRole, setSelectedRole] = useState<"driver" | "passenger">("driver");
   const [nameInput, setNameInput] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
   const [nicInput, setNicInput] = useState("");
   const [licenseInput, setLicenseInput] = useState("");
   const [vehicleTypeInput, setVehicleTypeInput] = useState<"tuk" | "car" | "truck" | "van">("car");
-  const [vehicleModelInput, setVehicleModelInput] = useState("Nissan Sunny B11 (300-1234)");
+  const [vehicleModelInput, setVehicleModelInput] = useState("Nissan Sunny B11");
   const [vehicleNoInput, setVehicleNoInput] = useState("300-1234");
   const [ratePerKmInput, setRatePerKmInput] = useState(150);
   const [villageInput, setVillageInput] = useState("තඹුත්තේගම");
@@ -159,11 +168,9 @@ export default function GalaxyRidesApp() {
   const [price, setPrice] = useState(1500);
   const [seats, setSeats] = useState(3);
 
-  // Rides List
+  // Rides & Rural Drivers
   const [ridePosts, setRidePosts] = useState<RidePost[]>([]);
   const [selectedRideForPassenger, setSelectedRideForPassenger] = useState<RidePost | null>(null);
-
-  // Rural Taxi Drivers List
   const [vehicleFilter, setVehicleFilter] = useState<string>("all");
   const [ruralDrivers, setRuralDrivers] = useState<RuralDriver[]>([
     {
@@ -192,19 +199,6 @@ export default function GalaxyRidesApp() {
       isVerified: true,
       isOnline: true,
     },
-    {
-      id: "RD-3",
-      name: "නිමල් (Dimo Batta)",
-      phone: "0751122334",
-      village: "එප්පාවල",
-      vehicleType: "truck",
-      vehicleName: "Dimo Batta Light Truck",
-      vehicleNo: "DA-9988",
-      ratePerKm: 200,
-      coords: [8.14, 80.32],
-      isVerified: true,
-      isOnline: true,
-    },
   ]);
 
   // Icons
@@ -220,50 +214,12 @@ export default function GalaxyRidesApp() {
 
   useEffect(() => {
     import("leaflet").then((L) => {
-      setGreenIcon(
-        new L.Icon({
-          iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
-          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-        })
-      );
-      setRedIcon(
-        new L.Icon({
-          iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-        })
-      );
-      setCarIcon(
-        new L.Icon({
-          iconUrl: "https://cdn-icons-png.flaticon.com/512/3202/3202003.png",
-          iconSize: [38, 38],
-          iconAnchor: [19, 19],
-        })
-      );
-      setPassengerIcon(
-        new L.Icon({
-          iconUrl: "https://cdn-icons-png.flaticon.com/512/2815/2815428.png",
-          iconSize: [35, 35],
-          iconAnchor: [17, 35],
-        })
-      );
-      setTukIcon(
-        new L.Icon({
-          iconUrl: "https://cdn-icons-png.flaticon.com/512/1048/1048314.png",
-          iconSize: [32, 32],
-          iconAnchor: [16, 16],
-        })
-      );
-      setTruckIcon(
-        new L.Icon({
-          iconUrl: "https://cdn-icons-png.flaticon.com/512/2554/2554978.png",
-          iconSize: [34, 34],
-          iconAnchor: [17, 17],
-        })
-      );
+      setGreenIcon(new L.Icon({ iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png", shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png", iconSize: [25, 41], iconAnchor: [12, 41] }));
+      setRedIcon(new L.Icon({ iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png", shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png", iconSize: [25, 41], iconAnchor: [12, 41] }));
+      setCarIcon(new L.Icon({ iconUrl: "https://cdn-icons-png.flaticon.com/512/3202/3202003.png", iconSize: [38, 38], iconAnchor: [19, 19] }));
+      setPassengerIcon(new L.Icon({ iconUrl: "https://cdn-icons-png.flaticon.com/512/2815/2815428.png", iconSize: [35, 35], iconAnchor: [17, 35] }));
+      setTukIcon(new L.Icon({ iconUrl: "https://cdn-icons-png.flaticon.com/512/1048/1048314.png", iconSize: [32, 32], iconAnchor: [16, 16] }));
+      setTruckIcon(new L.Icon({ iconUrl: "https://cdn-icons-png.flaticon.com/512/2554/2554978.png", iconSize: [34, 34], iconAnchor: [17, 17] }));
     });
   }, []);
 
@@ -271,6 +227,105 @@ export default function GalaxyRidesApp() {
     if (type === "tuk") return tukIcon;
     if (type === "truck") return truckIcon;
     return carIcon;
+  };
+
+  // --- SUPABASE AUTH HANDLERS ---
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      // 1. Supabase Auth Sign Up
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: emailInput,
+        password: passwordInput,
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        const profileData: UserProfile = {
+          id: authData.user.id,
+          email: emailInput,
+          name: nameInput,
+          phone: phoneInput,
+          nic: nicInput,
+          role: selectedRole,
+          isVerified: true,
+          drivingLicense: licenseInput,
+          vehicleType: vehicleTypeInput,
+          vehicleModel: vehicleModelInput,
+          vehicleNo: vehicleNoInput,
+          ratePerKm: ratePerKmInput,
+          villageOrCity: villageInput,
+        };
+
+        setCurrentUser(profileData);
+
+        if (selectedRole === "driver") {
+          setRuralDrivers((prev) => [
+            {
+              id: profileData.id,
+              name: profileData.name,
+              phone: profileData.phone,
+              village: villageInput || "ග්‍රාමීය ප්‍රදේශය",
+              vehicleType: vehicleTypeInput,
+              vehicleName: vehicleModelInput || "වාහනය",
+              vehicleNo: vehicleNoInput || "NC-XXXX",
+              ratePerKm: ratePerKmInput,
+              coords: [8.2 + Math.random() * 0.1, 80.3 + Math.random() * 0.1],
+              isVerified: true,
+              isOnline: true,
+            },
+            ...prev,
+          ]);
+        }
+
+        alert("✅ Account Registered & KYC Verified Successfully!");
+      }
+    } catch (err: any) {
+      alert("❌ Registration Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailInput,
+        password: passwordInput,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        // Mock profile load after successful login
+        const loggedUser: UserProfile = {
+          id: data.user.id,
+          email: data.user.email || emailInput,
+          name: emailInput.split("@")[0],
+          phone: "077XXXXXXX",
+          nic: "99XXXXXXXV",
+          role: selectedRole,
+          isVerified: true,
+        };
+        setCurrentUser(loggedUser);
+        alert("✅ Logged in successfully!");
+      }
+    } catch (err: any) {
+      alert("❌ Login Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setCurrentUser(null);
   };
 
   const fetchSuggestions = (query: string, setFn: (s: Suggestion[]) => void) => {
@@ -313,53 +368,6 @@ export default function GalaxyRidesApp() {
     }
   };
 
-  // Registration & KYC Auth
-  const handleAuth = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneInput || !nicInput) {
-      alert("කරුණාකර දුරකථන අංකය සහ NIC අංකය ඇතුළත් කරන්න.");
-      return;
-    }
-
-    const newUser: User = {
-      id: "USR-" + Date.now().toString().slice(-4),
-      name: nameInput || (selectedRole === "driver" ? "Driver App" : "Passenger App"),
-      phone: phoneInput,
-      nic: nicInput,
-      role: selectedRole,
-      isVerified: true,
-      drivingLicense: licenseInput,
-      vehicleType: vehicleTypeInput,
-      vehicleModel: vehicleModelInput,
-      vehicleNo: vehicleNoInput,
-      ratePerKm: ratePerKmInput,
-      villageOrCity: villageInput,
-    };
-
-    setCurrentUser(newUser);
-
-    // Auto-Register Driver into Local Directory
-    if (selectedRole === "driver") {
-      const newRuralDriver: RuralDriver = {
-        id: newUser.id,
-        name: newUser.name,
-        phone: newUser.phone,
-        village: villageInput || "ග්‍රාමීය ප්‍රදේශය",
-        vehicleType: vehicleTypeInput,
-        vehicleName: vehicleModelInput || "වාහනය",
-        vehicleNo: vehicleNoInput || "NC-XXXX",
-        ratePerKm: ratePerKmInput,
-        coords: [8.2 + Math.random() * 0.1, 80.3 + Math.random() * 0.1],
-        isVerified: true,
-        isOnline: true,
-      };
-      setRuralDrivers((prev) => [newRuralDriver, ...prev]);
-    }
-
-    alert("✅ Registration & KYC Verified Successfully!");
-  };
-
-  // Driver Post Ride
   const handlePublishRide = () => {
     if (!currentUser) return;
 
@@ -387,10 +395,9 @@ export default function GalaxyRidesApp() {
     alert("🚀 Ride Route Published Live!");
   };
 
-  // Live Driver Location Start
   const handleStartRide = (rideId: string) => {
     if (!navigator.geolocation) {
-      alert("⚠️ Your device does not support Geolocation!");
+      alert("⚠️️ Your device does not support Geolocation!");
       return;
     }
 
@@ -424,7 +431,6 @@ export default function GalaxyRidesApp() {
     );
   };
 
-  // Passenger Apply for Ride
   const handleApplyRide = (ride: RidePost) => {
     if (!currentUser) return;
 
@@ -451,7 +457,6 @@ export default function GalaxyRidesApp() {
     }
   };
 
-  // Driver Accept Passenger
   const handleAcceptPassenger = (rideId: string, passengerId: string) => {
     setRidePosts((prev) =>
       prev.map((r) => {
@@ -474,78 +479,122 @@ export default function GalaxyRidesApp() {
   return (
     <div style={{ fontFamily: "sans-serif", backgroundColor: "#0f172a", color: "#f8fafc", minHeight: "100vh", padding: "15px" }}>
       {!currentUser ? (
-        /* LOGIN / KYC REGISTRATION MODAL */
+        /* LOGIN / REGISTRATION TOGGLE FORM */
         <div style={{ maxWidth: "450px", margin: "40px auto", background: "#1e293b", padding: "25px", borderRadius: "12px", border: "1px solid #334155" }}>
-          <h2 style={{ color: "#38bdf8", textAlign: "center", margin: "0 0 15px 0" }}>🌌 Galaxy Rides Registration & KYC</h2>
+          <h2 style={{ color: "#38bdf8", textAlign: "center", margin: "0 0 15px 0" }}>🌌 Galaxy Rides Portal</h2>
 
-          <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
-            <button type="button" onClick={() => setSelectedRole("driver")} style={{ flex: 1, padding: "10px", background: selectedRole === "driver" ? "#0284c7" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>
-              🚘 Driver Mode
+          {/* Mode Switcher */}
+          <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+            <button
+              onClick={() => setAuthMode("login")}
+              style={{
+                flex: 1,
+                padding: "10px",
+                background: authMode === "login" ? "#0284c7" : "#0f172a",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              🔑 Log In
             </button>
-            <button type="button" onClick={() => setSelectedRole("passenger")} style={{ flex: 1, padding: "10px", background: selectedRole === "passenger" ? "#0284c7" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>
-              🙋‍♂️ Passenger Mode
+            <button
+              onClick={() => setAuthMode("register")}
+              style={{
+                flex: 1,
+                padding: "10px",
+                background: authMode === "register" ? "#0284c7" : "#0f172a",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              📝 Register (Sign Up)
             </button>
           </div>
 
-          <form onSubmit={handleAuth} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <form onSubmit={authMode === "login" ? handleLogin : handleRegister} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div>
-              <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>සම්පූර්ණ නම (Full Name):</label>
-              <input type="text" placeholder="e.g. කසුන් පෙරේරා" value={nameInput} onChange={(e) => setNameInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
+              <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>ඊමේල් ලිපිනය (Email Address):</label>
+              <input type="email" placeholder="user@example.com" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
             </div>
 
             <div>
-              <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>දුරකථන අංකය (Phone Number):</label>
-              <input type="text" placeholder="07XXXXXXXX" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
+              <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>මුරපදය (Password):</label>
+              <input type="password" placeholder="••••••••" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
             </div>
 
-            <div>
-              <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>NIC / හැඳුනුම්පත් අංකය (KYC Verification):</label>
-              <input type="text" placeholder="98XXXXXXXXV" value={nicInput} onChange={(e) => setNicInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
-            </div>
-
-            {selectedRole === "driver" && (
+            {authMode === "register" && (
               <>
-                <div>
-                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>Driving License Number:</label>
-                  <input type="text" value={licenseInput} onChange={(e) => setLicenseInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button type="button" onClick={() => setSelectedRole("driver")} style={{ flex: 1, padding: "8px", background: selectedRole === "driver" ? "#16a34a" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>🚘 Driver</button>
+                  <button type="button" onClick={() => setSelectedRole("passenger")} style={{ flex: 1, padding: "8px", background: selectedRole === "passenger" ? "#16a34a" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>🙋‍♂️ Passenger</button>
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>වාහන වර්ගය (Vehicle Category):</label>
-                  <select value={vehicleTypeInput} onChange={(e) => setVehicleTypeInput(e.target.value as any)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }}>
-                    <option value="tuk">🛺 Three-Wheeler</option>
-                    <option value="car">🚗 Car (B11, Alto, Maruti, etc.)</option>
-                    <option value="van">🚐 Van / Mini Bus</option>
-                    <option value="truck">🛻 Light Truck (Dimo Batta)</option>
-                  </select>
+                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>සම්පූර්ණ නම (Full Name):</label>
+                  <input type="text" placeholder="e.g. කසුන් පෙරේරා" value={nameInput} onChange={(e) => setNameInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>වාහන මොඩලයේ නම සහ අංකය:</label>
-                  <input type="text" value={vehicleModelInput} onChange={(e) => setVehicleModelInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
+                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>දුරකථන අංකය (Phone Number):</label>
+                  <input type="text" placeholder="07XXXXXXXX" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>ගම / නගරය (Village/Town):</label>
-                  <input type="text" value={villageInput} onChange={(e) => setVillageInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
+                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>NIC අංකය (KYC Verification):</label>
+                  <input type="text" placeholder="98XXXXXXXXV" value={nicInput} onChange={(e) => setNicInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
                 </div>
 
-                <div>
-                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>1 KM ගාස්තුව (Rs. Rate / KM):</label>
-                  <input type="number" value={ratePerKmInput} onChange={(e) => setRatePerKmInput(Number(e.target.value))} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
-                </div>
+                {selectedRole === "driver" && (
+                  <>
+                    <div>
+                      <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>Driving License Number:</label>
+                      <input type="text" value={licenseInput} onChange={(e) => setLicenseInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>වාහන වර්ගය:</label>
+                      <select value={vehicleTypeInput} onChange={(e) => setVehicleTypeInput(e.target.value as any)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }}>
+                        <option value="tuk">🛺 Three-Wheeler</option>
+                        <option value="car">🚗 Car (B11, Alto, etc.)</option>
+                        <option value="van">🚐 Van / Mini Bus</option>
+                        <option value="truck">🛻 Light Truck (Dimo Batta)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>වාහන මාදිලිය සහ අංකය:</label>
+                      <input type="text" value={vehicleModelInput} onChange={(e) => setVehicleModelInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>ගම / නගරය:</label>
+                      <input type="text" value={villageInput} onChange={(e) => setVillageInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>1 KM ගාස්තුව (Rs. Rate / KM):</label>
+                      <input type="number" value={ratePerKmInput} onChange={(e) => setRatePerKmInput(Number(e.target.value))} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
+                    </div>
+                  </>
+                )}
               </>
             )}
 
-            <button type="submit" style={{ padding: "12px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginTop: "10px" }}>
-              Submit & Complete Registration ✅
+            <button type="submit" disabled={loading} style={{ padding: "12px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginTop: "10px" }}>
+              {loading ? "Processing..." : authMode === "login" ? "🔑 Log In Now" : "📝 Complete Registration"}
             </button>
           </form>
         </div>
       ) : (
         /* MAIN APP INTERFACE */
         <div>
-          {/* Header & App Switcher */}
+          {/* Header */}
           <div style={{ background: "#1e293b", padding: "15px", borderRadius: "12px", marginBottom: "15px", border: "1px solid #334155" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
               <h2 style={{ margin: 0, color: "#38bdf8" }}>
@@ -557,14 +606,13 @@ export default function GalaxyRidesApp() {
                   👤 {currentUser.name} {currentUser.isVerified && <span style={{ color: "#4ade80" }}>Verified ✅</span>}
                 </div>
 
-                {/* Language Switcher */}
                 <select value={lang} onChange={(e) => setLang(e.target.value as Language)} style={{ padding: "6px", background: "#0f172a", color: "#fff", border: "1px solid #334155", borderRadius: "6px" }}>
                   <option value="si">🇱🇰 සිංහල</option>
                   <option value="en">🇬🇧 English</option>
                   <option value="ta">🇱🇰 தமிழ்</option>
                 </select>
 
-                <button onClick={() => setCurrentUser(null)} style={{ background: "#ef4444", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer" }}>
+                <button onClick={handleLogout} style={{ background: "#ef4444", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer" }}>
                   Logout
                 </button>
               </div>
@@ -581,12 +629,11 @@ export default function GalaxyRidesApp() {
             </div>
           </div>
 
-          {/* MODE 1: ROUTE SHARING (CARPOOL WITH LIVE OSRM & GPS TRACKING) */}
+          {/* MODE 1: ROUTE SHARING */}
           {activeTab === "carpool" && (
             <div>
               {currentUser.role === "driver" ? (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "20px" }}>
-                  {/* Left: Driver Route Post & List */}
                   <div>
                     <div style={{ background: "#1e293b", padding: "18px", borderRadius: "12px", marginBottom: "15px", border: "1px solid #334155" }}>
                       <h3 style={{ color: "#38bdf8", margin: "0 0 10px 0" }}>🚗 Post Live Route (OSRM Distance)</h3>
@@ -645,7 +692,6 @@ export default function GalaxyRidesApp() {
                           </button>
                         )}
 
-                        {/* Passenger Requests */}
                         {ride.requests.length > 0 && (
                           <div style={{ marginTop: "10px", background: "#0f172a", padding: "10px", borderRadius: "8px" }}>
                             <h5 style={{ margin: "0 0 6px 0", color: "#f59e0b" }}>📩 Passenger Requests:</h5>
@@ -665,7 +711,6 @@ export default function GalaxyRidesApp() {
                     ))}
                   </div>
 
-                  {/* Right: Map View */}
                   <div style={{ height: "550px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
                     <MapContainer bounds={mapBounds} style={{ height: "100%", width: "100%" }}>
                       <MapFlyTo bounds={mapBounds} />
@@ -674,14 +719,12 @@ export default function GalaxyRidesApp() {
                       {redIcon && <Marker position={endCoords} icon={redIcon}><Popup>End</Popup></Marker>}
                       {roadRoute.length > 0 && <Polyline positions={roadRoute} pathOptions={{ color: "#2563eb", weight: 5 }} />}
 
-                      {/* Live Driver Moving Position */}
                       {ridePosts.find((r) => r.driverId === currentUser.id)?.driverLiveCoords && carIcon && (
                         <Marker position={ridePosts.find((r) => r.driverId === currentUser.id)!.driverLiveCoords!} icon={carIcon}>
                           <Popup>🚘 Your Live Position</Popup>
                         </Marker>
                       )}
 
-                      {/* Accepted Passengers */}
                       {ridePosts.find((r) => r.driverId === currentUser.id)?.requests.filter((req) => req.status === "accepted").map((req, i) => (
                         passengerIcon && (
                           <Marker key={i} position={req.passengerCoords} icon={passengerIcon}>
@@ -693,7 +736,6 @@ export default function GalaxyRidesApp() {
                   </div>
                 </div>
               ) : (
-                /* PASSENGER CARPOOL VIEW */
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "20px" }}>
                   <div>
                     <h3>🚗 Available Driver Rides</h3>
@@ -717,7 +759,6 @@ export default function GalaxyRidesApp() {
                     ))}
                   </div>
 
-                  {/* Passenger Map View */}
                   <div style={{ height: "550px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
                     <MapContainer bounds={mapBounds} style={{ height: "100%", width: "100%" }}>
                       <MapFlyTo bounds={mapBounds} />
@@ -743,13 +784,12 @@ export default function GalaxyRidesApp() {
             </div>
           )}
 
-          {/* MODE 2: RURAL TAXI & TRANSPORT DIRECTORY (LOCAL CALL/WHATSAPP & FILTER) */}
+          {/* MODE 2: RURAL TAXI & TRANSPORT DIRECTORY */}
           {activeTab === "rural_taxi" && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "20px" }}>
-              {/* Directory & Filters */}
               <div>
                 <div style={{ background: "#1e293b", padding: "12px", borderRadius: "12px", marginBottom: "15px", border: "1px solid #334155" }}>
-                  <h4 style={{ margin: "0 0 10px 0", color: "#4ade80" }}>🔎 වාහන වර්ගය තෝරන්න (Category Filter)</h4>
+                  <h4 style={{ margin: "0 0 10px 0", color: "#4ade80" }}>🔎 වාහන වර්ගය තෝරන්න</h4>
                   <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                     <button onClick={() => setVehicleFilter("all")} style={{ padding: "6px 12px", background: vehicleFilter === "all" ? "#16a34a" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}>සියල්ල</button>
                     <button onClick={() => setVehicleFilter("tuk")} style={{ padding: "6px 12px", background: vehicleFilter === "tuk" ? "#16a34a" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}>🛺 ත්‍රීවීල්</button>
@@ -786,7 +826,6 @@ export default function GalaxyRidesApp() {
                 ))}
               </div>
 
-              {/* Local Drivers Map */}
               <div style={{ height: "550px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
                 <MapContainer center={[8.3114, 80.4037]} zoom={10} style={{ height: "100%", width: "100%" }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
