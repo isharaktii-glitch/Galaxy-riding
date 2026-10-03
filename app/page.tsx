@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
 
-// Dynamic Leaflet Imports
+// Dynamic Leaflet Imports for SSR
 const MapContainer = dynamic(
   () => import('react-leaflet').then((mod) => mod.MapContainer),
   { ssr: false }
@@ -36,8 +36,14 @@ function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }
   return null;
 }
 
+// Landmark Data Interface (Strict Coordinate Tuple Type)
+interface Landmark {
+  name: string;
+  coords: [number, number];
+}
+
 // Sri Lanka Famous Landmark Places Suggestion Database
-const landmarkDatabase = [
+const landmarkDatabase: Landmark[] = [
   { name: 'Kandy City Centre (KCC)', coords: [7.2936, 80.6350] },
   { name: 'Kandy Sri Dalada Maligawa (Temple of Tooth)', coords: [7.2936, 80.6413] },
   { name: 'Hanthana Mountain Range, Kandy', coords: [7.2581, 80.6272] },
@@ -65,15 +71,8 @@ export default function GalaxyRidesPro() {
   const [startInput, setStartInput] = useState('');
   const [destInput, setDestInput] = useState('');
   const [selectedCoords, setSelectedCoords] = useState<[number, number] | null>(null);
-  const [suggestions, setSuggestions] = useState<typeof landmarkDatabase>([]);
+  const [suggestions, setSuggestions] = useState<Landmark[]>([]);
   const [activeSearchField, setActiveSearchField] = useState<'START' | 'DEST' | null>(null);
-
-  // Driver Contact / Registration Data
-  const [driverProfile] = useState({
-    name: 'Ishara Sadaruwan',
-    phone: '+94771234567',
-    whatsapp: '+94771234567',
-  });
 
   // Published Live Rides (State)
   const [publishedRides, setPublishedRides] = useState([
@@ -131,7 +130,7 @@ export default function GalaxyRidesPro() {
   };
 
   // Select Suggestion Option
-  const selectSuggestion = (place: { name: string; coords: [number, number] }) => {
+  const selectSuggestion = (place: Landmark) => {
     if (activeSearchField === 'START') {
       setStartInput(place.name);
     } else {
@@ -146,9 +145,9 @@ export default function GalaxyRidesPro() {
     if (selectedCoords) {
       setMapCenter(selectedCoords);
       setMapZoom(15); // High Resolution Google Maps Zoom Level
-      alert('📍 Map target location locked & zoomed in successfully!');
+      alert('📍 Target location locked & map zoomed in successfully!');
     } else {
-      alert('කරුණාකර List එකෙන් අදාල ස්ථානය තෝරාගන්න.');
+      alert('කරුණාකර Suggesion List එකෙන් අදාල ස්ථානය තෝරාගන්න.');
     }
   };
 
@@ -172,9 +171,9 @@ export default function GalaxyRidesPro() {
           setPublishedRides((prev) =>
             prev.map((r) => (r.id === rideId ? { ...r, status: 'STARTED' } : r))
           );
-          alert('🚀 Ride Started! Live GPS location active on Passenger Map.');
+          alert('🚀 Ride Started! Live GPS location active on Map.');
         },
-        () => alert('කරුණාකර ඔබගේ GPS/Location On කරන්න.')
+        () => alert('කරුණාකර ඔබගේ Device Location On කරන්න.')
       );
     }
   };
@@ -187,7 +186,7 @@ export default function GalaxyRidesPro() {
           const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
           setPassengerPickupRequest(coords);
           setMapCenter(coords);
-          alert('📩 "Come to My Location" Request sent to Driver with Live Location!');
+          alert('📩 "Come to My Location" Request sent to Driver with Live GPS Coords!');
         },
         () => alert('කරුණාකර ඔබගේ Location On කරන්න.')
       );
