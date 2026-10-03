@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
-// Dynamic SSR Safety Leaflet Imports
+// Leaflet Dynamic SSR Imports
 const MapContainer = dynamic(
   () => import('react-leaflet').then((m) => m.MapContainer),
   { ssr: false }
@@ -41,7 +41,7 @@ export default function GalaxyRidesPro() {
   const [isMounted, setIsMounted] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
 
-  // Registration Form State
+  // Registration User State
   const [regData, setRegData] = useState({
     fullName: '',
     phone: '',
@@ -60,8 +60,8 @@ export default function GalaxyRidesPro() {
   const [suggestions, setSuggestions] = useState<Landmark[]>([]);
   const [activeField, setActiveField] = useState<'START' | 'DEST' | null>(null);
 
-  // Published Rides
-  const [publishedRides, setPublishedRides] = useState([
+  // Rides Feed
+  const [publishedRides] = useState([
     {
       id: 'ride1',
       driverName: 'Ishara Sadaruwan',
@@ -80,7 +80,6 @@ export default function GalaxyRidesPro() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Leaflet default icons fix
     import('leaflet').then((L) => {
       // @ts-ignore
       delete L.Icon.Default.prototype._getIconUrl;
@@ -96,7 +95,6 @@ export default function GalaxyRidesPro() {
     e.preventDefault();
     if (regData.fullName && regData.phone) {
       setIsRegistered(true);
-      alert('🎉 Galaxy Rides වලට සාර්ථකව සම්බන්ධ වුණා!');
     }
   };
 
@@ -125,7 +123,9 @@ export default function GalaxyRidesPro() {
   };
 
   const handleDoneLocation = () => {
-    alert(`📍 Target locked: ${destInput}`);
+    if (selectedCoords) {
+      alert(`📍 Target locked: ${destInput}`);
+    }
   };
 
   const handleStartRide = () => {
@@ -135,9 +135,9 @@ export default function GalaxyRidesPro() {
           const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
           setDriverLiveLocation(coords);
           setSelectedCoords(coords);
-          alert('🚀 Live GPS Tracking Active!');
+          alert('🚀 GPS Tracking Activated!');
         },
-        () => alert('කරුණාකර GPS Location Access ලබා දෙන්න.')
+        () => alert('කරුණාකර Device Location Access සක්‍රීය කරන්න.')
       );
     }
   };
@@ -147,10 +147,10 @@ export default function GalaxyRidesPro() {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans text-slate-100">
       
-      {/* Dynamic Leaflet CSS Injection */}
+      {/* Dynamic Leaflet Styles */}
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-      {/* 1. Full Screen Interactive Map */}
+      {/* 1. Full Screen Map Background */}
       <div className="absolute inset-0 z-0">
         <MapContainer center={selectedCoords} zoom={12} zoomControl={false} className="w-full h-full">
           <TileLayer
@@ -162,22 +162,24 @@ export default function GalaxyRidesPro() {
           </Marker>
           {driverLiveLocation && (
             <Marker position={driverLiveLocation}>
-              <Popup>🚕 Live Driver Location</Popup>
+              <Popup>🚕 Driver Live Position</Popup>
             </Marker>
           )}
         </MapContainer>
       </div>
 
-      {/* 2. Registration Overlay (Glassmorphism Modal) */}
+      {/* 2. Stunning Glassmorphism 3D Registration Modal */}
       {!isRegistered && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="bg-slate-900/90 border border-sky-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+          <div className="bg-slate-900/90 border border-sky-500/40 rounded-3xl p-6 max-w-md w-full shadow-[0_0_50px_rgba(14,165,233,0.3)] space-y-4">
             <div className="text-center space-y-1">
-              <div className="w-12 h-12 bg-sky-600 rounded-2xl flex items-center justify-center text-2xl mx-auto shadow-lg shadow-sky-500/30">
+              <div className="w-14 h-14 bg-gradient-to-tr from-sky-600 to-indigo-600 rounded-2xl flex items-center justify-center text-3xl mx-auto shadow-lg shadow-sky-500/40">
                 🌌
               </div>
-              <h1 className="text-xl font-bold text-white tracking-wide">Galaxy Rides Pro</h1>
-              <p className="text-xs text-slate-400">ඔබගේ Account එක නිර්මාණය කර එකතු වන්න</p>
+              <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500 tracking-wide">
+                Galaxy Rides Pro
+              </h1>
+              <p className="text-xs text-slate-400">ඔබගේ Account එක සෑදීමට විස්තර ඇතුළත් කරන්න</p>
             </div>
 
             <form onSubmit={handleRegister} className="space-y-3 text-xs">
@@ -189,7 +191,7 @@ export default function GalaxyRidesPro() {
                   value={regData.fullName}
                   onChange={(e) => setRegData({ ...regData, fullName: e.target.value })}
                   placeholder="Ishara Sadaruwan"
-                  className="w-full bg-slate-950/90 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-950/90 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-sky-500 shadow-inner"
                 />
               </div>
 
@@ -201,12 +203,12 @@ export default function GalaxyRidesPro() {
                   value={regData.phone}
                   onChange={(e) => setRegData({ ...regData, phone: e.target.value })}
                   placeholder="+94 77 123 4567"
-                  className="w-full bg-slate-950/90 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-950/90 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-sky-500 shadow-inner"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">ඔබගේ භූමිකාව (Role)</label>
+                <label className="block text-slate-300 mb-1 font-semibold">Account Type (Role)</label>
                 <select
                   value={regData.role}
                   onChange={(e) => setRegData({ ...regData, role: e.target.value as 'DRIVER' | 'PASSENGER' })}
@@ -226,26 +228,26 @@ export default function GalaxyRidesPro() {
                     value={regData.vehicleNo}
                     onChange={(e) => setRegData({ ...regData, vehicleNo: e.target.value })}
                     placeholder="WP CAD-1234"
-                    className="w-full bg-slate-950/90 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-sky-500"
+                    className="w-full bg-slate-950/90 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-sky-500 shadow-inner"
                   />
                 </div>
               )}
 
               <button
                 type="submit"
-                className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-sky-600/30 transition text-sm mt-2"
+                className="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-sky-500/30 transition-all text-sm mt-2"
               >
-                Register & Continue 🚀
+                Register & Enter System 🚀
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* 3. Top Floating Glassmorphic Header */}
-      <div className="absolute top-4 left-4 right-4 z-10 max-w-xl mx-auto flex justify-between items-center bg-slate-900/85 backdrop-blur-md p-3 rounded-2xl border border-slate-700/60 shadow-xl">
+      {/* 3. Top Floating Glassmorphic App Bar */}
+      <div className="absolute top-4 left-4 right-4 z-10 max-w-xl mx-auto flex justify-between items-center bg-slate-900/85 backdrop-blur-md p-3 rounded-2xl border border-slate-700/60 shadow-2xl">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-sky-600 rounded-xl flex items-center justify-center text-lg shadow font-bold">
+          <div className="w-10 h-10 bg-gradient-to-br from-sky-500 to-blue-700 rounded-xl flex items-center justify-center text-xl shadow-md font-bold">
             🌌
           </div>
           <div>
@@ -258,7 +260,7 @@ export default function GalaxyRidesPro() {
               )}
             </div>
             <p className="text-[10px] text-slate-300">
-              {regData.fullName ? `${regData.fullName} (${regData.role})` : 'System Ready'}
+              {regData.fullName ? `${regData.fullName} (${regData.role})` : 'Guest Mode'}
             </p>
           </div>
         </div>
@@ -274,14 +276,14 @@ export default function GalaxyRidesPro() {
           )}
           <button
             onClick={() => setRegData({ ...regData, role: regData.role === 'DRIVER' ? 'PASSENGER' : 'DRIVER' })}
-            className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-bold px-2.5 py-1.5 rounded-xl shadow"
+            className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-bold px-2.5 py-1.5 rounded-xl shadow font-sans"
           >
-            Switch to {regData.role === 'DRIVER' ? 'Passenger' : 'Driver'}
+            Switch Role
           </button>
         </div>
       </div>
 
-      {/* 4. Bottom Main Action Panel */}
+      {/* 4. Bottom Main Glassmorphic Action Sheet */}
       <div className="absolute bottom-4 left-4 right-4 z-10 max-w-xl mx-auto">
         <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/70 rounded-3xl p-4 shadow-2xl space-y-3 max-h-[75vh] overflow-y-auto">
           <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto opacity-50"></div>
@@ -289,7 +291,7 @@ export default function GalaxyRidesPro() {
           {regData.role === 'DRIVER' ? (
             <div className="space-y-3">
               <h2 className="text-xs font-bold text-sky-400 flex items-center gap-1">
-                <span>🚕</span> Post Driver Route & Suggestions
+                <span>🚕</span> Driver Route & Auto-Suggestions
               </h2>
 
               <div className="space-y-2 relative">
@@ -297,7 +299,7 @@ export default function GalaxyRidesPro() {
                   type="text"
                   value={startInput}
                   onChange={(e) => handleSearch(e.target.value, 'START')}
-                  placeholder="Type Start (e.g. Colombo Fort)"
+                  placeholder="Type Start Location (e.g. Colombo Fort)"
                   className="w-full bg-slate-950/90 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
                 />
 
@@ -317,6 +319,7 @@ export default function GalaxyRidesPro() {
                   </button>
                 </div>
 
+                {/* Suggestions List Dropdown */}
                 {suggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-sky-500/50 rounded-xl shadow-2xl z-50 max-h-36 overflow-y-auto">
                     {suggestions.map((item, idx) => (
@@ -333,7 +336,7 @@ export default function GalaxyRidesPro() {
               </div>
 
               {publishedRides.map((ride) => (
-                <div key={ride.id} className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                <div key={ride.id} className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800 space-y-2 text-xs">
                   <div className="flex justify-between items-center">
                     <p className="font-bold text-sky-300">🚕 {ride.driverName} {isKycVerified && '✅'}</p>
                     <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-amber-400">
@@ -343,9 +346,9 @@ export default function GalaxyRidesPro() {
                   <p className="text-slate-300 text-[11px]">📍 {ride.start} ➔ {ride.dest}</p>
                   <button
                     onClick={handleStartRide}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-xl text-xs"
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-xl text-xs shadow-lg shadow-blue-600/30"
                   >
-                    Start Ride (GPS On) 🚀
+                    Start Ride (GPS Tracking) 🚀
                   </button>
                 </div>
               ))}
@@ -354,7 +357,7 @@ export default function GalaxyRidesPro() {
             <div className="space-y-3">
               <h2 className="text-xs font-bold text-amber-400">🔍 Available Rides Near You</h2>
               {publishedRides.map((ride) => (
-                <div key={ride.id} className="bg-slate-950 p-3 rounded-2xl border border-sky-500/30 space-y-2 text-xs">
+                <div key={ride.id} className="bg-slate-950/80 p-3 rounded-2xl border border-sky-500/30 space-y-2 text-xs">
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-bold text-sky-300">🚕 {ride.driverName} {ride.isVerified && '✅'}</p>
@@ -394,7 +397,7 @@ export default function GalaxyRidesPro() {
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-5 max-w-md w-full space-y-3">
             <h2 className="text-sm font-bold text-sky-400">🛡️ Driver KYC Identity Verification</h2>
             <p className="text-xs text-slate-300">
-              Verified Driver Badge (✅) එක සඳහා ඔබේ NIC / Driving License තොරතුරු ලබා දෙන්න.
+              Verified Driver Badge (✅) එක සඳහා ඔබේ NIC / Driving License ඡායාරූපයක් එක් කරන්න.
             </p>
             <div className="space-y-2 text-xs">
               <input type="file" className="w-full text-slate-300 bg-slate-950 p-2 rounded-xl border border-slate-800" />
@@ -403,7 +406,7 @@ export default function GalaxyRidesPro() {
                 onClick={() => {
                   setIsKycVerified(true);
                   setIsKycModalOpen(false);
-                  alert('✅ Verified Driver status active!');
+                  alert('✅ Verified Driver Status Granted!');
                 }}
                 className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded-xl mt-2"
               >
