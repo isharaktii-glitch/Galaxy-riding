@@ -1,829 +1,499 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useRef } from "react";
-import dynamic from "next/dynamic";
+import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+import 'leaflet/dist/leaflet.css';
 
-// Dynamic Imports for Leaflet (SSR Safety for Next.js)
+// Dynamic Leaflet Imports
 const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
+  () => import('react-leaflet').then((mod) => mod.MapContainer),
   { ssr: false }
 );
 const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
+  () => import('react-leaflet').then((mod) => mod.TileLayer),
   { ssr: false }
 );
 const Marker = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Marker),
+  () => import('react-leaflet').then((mod) => mod.Marker),
   { ssr: false }
 );
 const Popup = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Popup),
+  () => import('react-leaflet').then((mod) => mod.Popup),
   { ssr: false }
 );
 const Polyline = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Polyline),
+  () => import('react-leaflet').then((mod) => mod.Polyline),
   { ssr: false }
 );
 
-const MapFlyTo = dynamic(
-  () =>
-    import("react-leaflet").then((mod) => {
-      const Component = ({
-        bounds,
-        center,
-        zoom,
-      }: {
-        bounds?: [[number, number], [number, number]];
-        center?: [number, number];
-        zoom?: number;
-      }) => {
-        const map = mod.useMap();
-        useEffect(() => {
-          if (map) {
-            if (bounds && bounds[0][0] !== bounds[1][0]) {
-              map.flyToBounds(bounds, { padding: [50, 50], duration: 1.5 });
-            } else if (center && zoom) {
-              map.flyTo(center, zoom, { animate: true, duration: 1.5 });
-            }
-          }
-        }, [bounds, center, zoom, map]);
-        return null;
-      };
-      return Component;
-    }),
-  { ssr: false }
-);
-
-// Types
-type Language = "si" | "en" | "ta";
-type AppTab = "carpool" | "rural_taxi";
-type AuthMode = "login" | "register";
-
-interface UserProfile {
-  id: string;
-  email: string;
-  name: string;
-  phone: string;
-  nic: string;
-  role: "driver" | "passenger";
-  isVerified: boolean;
-  drivingLicense?: string;
-  vehicleType?: "tuk" | "car" | "truck" | "van";
-  vehicleModel?: string;
-  vehicleNo?: string;
-  ratePerKm?: number;
-  villageOrCity?: string;
+// Map Center Reset Handler
+function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }) {
+  const { useMap } = require('react-leaflet');
+  const map = useMap();
+  useEffect(() => {
+    if (map) map.setView(center, zoom);
+  }, [center, zoom, map]);
+  return null;
 }
 
-interface Suggestion {
-  display_name: string;
-  lat: string;
-  lon: string;
-}
+// Sri Lanka Famous Landmark Places Suggestion Database
+const landmarkDatabase = [
+  { name: 'Kandy City Centre (KCC)', coords: [7.2936, 80.6350] },
+  { name: 'Kandy Sri Dalada Maligawa (Temple of Tooth)', coords: [7.2936, 80.6413] },
+  { name: 'Hanthana Mountain Range, Kandy', coords: [7.2581, 80.6272] },
+  { name: 'Peradeniya Botanical Garden, Kandy', coords: [7.2683, 80.5966] },
+  { name: 'Colombo Fort Railway Station', coords: [6.9344, 79.8510] },
+  { name: 'One Galle Face Mall, Colombo', coords: [6.9272, 79.8454] },
+  { name: 'Galle Bus Stand & Dutch Fort', coords: [6.0329, 80.2168] },
+  { name: 'Jaffna Railway Station', coords: [9.6647, 80.0255] },
+];
 
-interface PassengerRequest {
-  passengerId: string;
-  passengerName: string;
-  passengerPhone: string;
-  passengerCoords: [number, number];
-  status: "pending" | "accepted" | "rejected";
-}
+export default function GalaxyRidesPro() {
+  const [isMounted, setIsMounted] = useState(false);
+  const [userRole, setUserRole] = useState<'PASSENGER' | 'DRIVER'>('DRIVER');
 
-interface RidePost {
-  id: string;
-  driverId: string;
-  driverName: string;
-  driverPhone: string;
-  isVerified: boolean;
-  vehicle: string;
-  vehicleType?: string;
-  seats: number;
-  price: number;
-  startName: string;
-  startCoords: [number, number];
-  endName: string;
-  endCoords: [number, number];
-  routePolyline: [number, number][];
-  distanceKm: string;
-  status: "created" | "started" | "finished";
-  driverLiveCoords?: [number, number];
-  requests: PassengerRequest[];
-}
+  // KYC Verification States
+  const [isKycModalOpen, setIsKycModalOpen] = useState(false);
+  const [isKycVerified, setIsKycVerified] = useState(false);
+  const [kycForm, setKycForm] = useState({ idCard: null, faceScanDone: false, jobProof: null });
 
-interface RuralDriver {
-  id: string;
-  name: string;
-  phone: string;
-  village: string;
-  vehicleType: "tuk" | "car" | "truck" | "van";
-  vehicleName: string;
-  vehicleNo: string;
-  ratePerKm: number;
-  coords: [number, number];
-  isVerified: boolean;
-  isOnline: boolean;
-}
+  // Map Focus State
+  const [mapCenter, setMapCenter] = useState<[number, number]>([6.9271, 79.8612]);
+  const [mapZoom, setMapZoom] = useState(10);
 
-export default function GalaxyRidesApp() {
-  const [lang, setLang] = useState<Language>("si");
-  const [activeTab, setActiveTab] = useState<AppTab>("carpool");
+  // Driver Form & Search States
+  const [startInput, setStartInput] = useState('');
+  const [destInput, setDestInput] = useState('');
+  const [selectedCoords, setSelectedCoords] = useState<[number, number] | null>(null);
+  const [suggestions, setSuggestions] = useState<typeof landmarkDatabase>([]);
+  const [activeSearchField, setActiveSearchField] = useState<'START' | 'DEST' | null>(null);
 
-  // Auth States
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  // Driver Contact / Registration Data
+  const [driverProfile] = useState({
+    name: 'Ishara Sadaruwan',
+    phone: '+94771234567',
+    whatsapp: '+94771234567',
+  });
 
-  // Form Fields
-  const [emailInput, setEmailInput] = useState("");
-  const [passwordInput, setPasswordInput] = useState("");
-  const [selectedRole, setSelectedRole] = useState<"driver" | "passenger">("driver");
-  const [nameInput, setNameInput] = useState("");
-  const [phoneInput, setPhoneInput] = useState("");
-  const [nicInput, setNicInput] = useState("");
-  const [licenseInput, setLicenseInput] = useState("");
-  const [vehicleTypeInput, setVehicleTypeInput] = useState<"tuk" | "car" | "truck" | "van">("car");
-  const [vehicleModelInput, setVehicleModelInput] = useState("Nissan Sunny B11");
-  const [vehicleNoInput, setVehicleNoInput] = useState("300-1234");
-  const [ratePerKmInput, setRatePerKmInput] = useState(150);
-  const [villageInput, setVillageInput] = useState("තඹුත්තේගම");
-
-  // Location & Form
-  const [startQuery, setStartQuery] = useState("Colombo Fort");
-  const [startCoords, setStartCoords] = useState<[number, number]>([6.9344, 79.8428]);
-  const [startSuggestions, setStartSuggestions] = useState<Suggestion[]>([]);
-
-  const [endQuery, setEndQuery] = useState("Kandy Clock Tower");
-  const [endCoords, setEndCoords] = useState<[number, number]>([7.2906, 80.6337]);
-  const [endSuggestions, setEndSuggestions] = useState<Suggestion[]>([]);
-
-  const [mapBounds, setMapBounds] = useState<[[number, number], [number, number]]>([
-    [6.9344, 79.8428],
-    [7.2906, 80.6337],
-  ]);
-
-  const [roadRoute, setRoadRoute] = useState<[number, number][]>([]);
-  const [routeDistance, setRouteDistance] = useState<string>("");
-
-  const [price, setPrice] = useState(1500);
-  const [seats, setSeats] = useState(3);
-
-  // Rides & Rural Drivers
-  const [ridePosts, setRidePosts] = useState<RidePost[]>([]);
-  const [selectedRideForPassenger, setSelectedRideForPassenger] = useState<RidePost | null>(null);
-  const [vehicleFilter, setVehicleFilter] = useState<string>("all");
-  const [ruralDrivers, setRuralDrivers] = useState<RuralDriver[]>([
+  // Published Live Rides (State)
+  const [publishedRides, setPublishedRides] = useState([
     {
-      id: "RD-1",
-      name: "සුනිල් අයියා",
-      phone: "0771234567",
-      village: "තඹුත්තේගම",
-      vehicleType: "tuk",
-      vehicleName: "4-Stroke Three-Wheel",
-      vehicleNo: "AB-1234",
-      ratePerKm: 120,
-      coords: [8.15, 80.2833],
+      id: 'ride1',
+      driverName: 'Ishara Sadaruwan',
       isVerified: true,
-      isOnline: true,
-    },
-    {
-      id: "RD-2",
-      name: "සමන්ත (B11)",
-      phone: "0719876543",
-      village: "අනුරාධපුරය",
-      vehicleType: "car",
-      vehicleName: "Nissan Sunny B11",
-      vehicleNo: "300-5678",
-      ratePerKm: 150,
-      coords: [8.3114, 80.4037],
-      isVerified: true,
-      isOnline: true,
+      whatsapp: '+94771234567',
+      phone: '+94771234567',
+      start: 'Colombo Fort Railway Station',
+      dest: 'Kandy Sri Dalada Maligawa (Temple of Tooth)',
+      destCoords: [7.2936, 80.6413] as [number, number],
+      price: 1500,
+      seats: 3,
+      status: 'SCHEDULED', // SCHEDULED, STARTED, FINISHED
     },
   ]);
 
-  // Icons
-  const [greenIcon, setGreenIcon] = useState<any>(null);
-  const [redIcon, setRedIcon] = useState<any>(null);
-  const [carIcon, setCarIcon] = useState<any>(null);
-  const [passengerIcon, setPassengerIcon] = useState<any>(null);
-  const [tukIcon, setTukIcon] = useState<any>(null);
-  const [truckIcon, setTruckIcon] = useState<any>(null);
+  // Live Tracking States
+  const [driverLiveLocation, setDriverLiveLocation] = useState<[number, number] | null>(null);
+  const [passengerPickupRequest, setPassengerPickupRequest] = useState<[number, number] | null>(null);
 
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-  const watchIdRef = useRef<number | null>(null);
+  // Rating & Review State
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [reviews, setReviews] = useState<{ passenger: string; stars: number; comment: string }[]>([]);
 
   useEffect(() => {
-    import("leaflet").then((L) => {
-      setGreenIcon(new L.Icon({ iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png", shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png", iconSize: [25, 41], iconAnchor: [12, 41] }));
-      setRedIcon(new L.Icon({ iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png", shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png", iconSize: [25, 41], iconAnchor: [12, 41] }));
-      setCarIcon(new L.Icon({ iconUrl: "https://cdn-icons-png.flaticon.com/512/3202/3202003.png", iconSize: [38, 38], iconAnchor: [19, 19] }));
-      setPassengerIcon(new L.Icon({ iconUrl: "https://cdn-icons-png.flaticon.com/512/2815/2815428.png", iconSize: [35, 35], iconAnchor: [17, 35] }));
-      setTukIcon(new L.Icon({ iconUrl: "https://cdn-icons-png.flaticon.com/512/1048/1048314.png", iconSize: [32, 32], iconAnchor: [16, 16] }));
-      setTruckIcon(new L.Icon({ iconUrl: "https://cdn-icons-png.flaticon.com/512/2554/2554978.png", iconSize: [34, 34], iconAnchor: [17, 17] }));
+    setIsMounted(true);
+    import('leaflet').then((L) => {
+      // @ts-ignore
+      delete L.Icon.Default.prototype._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+      });
     });
   }, []);
 
-  const getDriverIcon = (type: string) => {
-    if (type === "tuk") return tukIcon;
-    if (type === "truck") return truckIcon;
-    return carIcon;
-  };
+  // Handle Search Input Change & Auto Suggestions
+  const handleInputChange = (text: string, field: 'START' | 'DEST') => {
+    if (field === 'START') setStartInput(text);
+    else setDestInput(text);
+    setActiveSearchField(field);
 
-  // --- LOCAL AUTH HANDLERS ---
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    setTimeout(() => {
-      const profileData: UserProfile = {
-        id: "USR-" + Date.now().toString().slice(-4),
-        email: emailInput,
-        name: nameInput,
-        phone: phoneInput,
-        nic: nicInput,
-        role: selectedRole,
-        isVerified: true,
-        drivingLicense: licenseInput,
-        vehicleType: vehicleTypeInput,
-        vehicleModel: vehicleModelInput,
-        vehicleNo: vehicleNoInput,
-        ratePerKm: ratePerKmInput,
-        villageOrCity: villageInput,
-      };
-
-      setCurrentUser(profileData);
-
-      if (selectedRole === "driver") {
-        setRuralDrivers((prev) => [
-          {
-            id: profileData.id,
-            name: profileData.name,
-            phone: profileData.phone,
-            village: villageInput || "ග්‍රාමීය ප්‍රදේශය",
-            vehicleType: vehicleTypeInput,
-            vehicleName: vehicleModelInput || "වාහනය",
-            vehicleNo: vehicleNoInput || "NC-XXXX",
-            ratePerKm: ratePerKmInput,
-            coords: [8.2 + Math.random() * 0.1, 80.3 + Math.random() * 0.1],
-            isVerified: true,
-            isOnline: true,
-          },
-          ...prev,
-        ]);
-      }
-
-      setLoading(false);
-      alert("✅ Account Registered & KYC Verified Successfully!");
-    }, 500);
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    setTimeout(() => {
-      const loggedUser: UserProfile = {
-        id: "USR-" + Date.now().toString().slice(-4),
-        email: emailInput,
-        name: emailInput.split("@")[0],
-        phone: "0771234567",
-        nic: "991234567V",
-        role: selectedRole,
-        isVerified: true,
-      };
-      setCurrentUser(loggedUser);
-      setLoading(false);
-      alert("✅ Logged in successfully!");
-    }, 500);
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-  };
-
-  const fetchSuggestions = (query: string, setFn: (s: Suggestion[]) => void) => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    if (query.trim().length < 2) {
-      setFn([]);
-      return;
-    }
-    debounceTimer.current = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ", Sri Lanka")}&limit=5`
-        );
-        const data = await res.json();
-        setFn(data || []);
-      } catch (err) {
-        console.error("Autosuggest Error:", err);
-      }
-    }, 300);
-  };
-
-  const updateRoute = async (start: [number, number], end: [number, number]) => {
-    try {
-      const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (data.routes && data.routes.length > 0) {
-        const coordinates = data.routes[0].geometry.coordinates;
-        const leafletCoords: [number, number][] = coordinates.map((coord: [number, number]) => [coord[1], coord[0]]);
-        setRoadRoute(leafletCoords);
-        setRouteDistance(`${(data.routes[0].distance / 1000).toFixed(1)} km`);
-        setMapBounds([
-          [Math.min(start[0], end[0]), Math.min(start[1], end[1])],
-          [Math.max(start[0], end[0]), Math.max(start[1], end[1])],
-        ]);
-      }
-    } catch (err) {
-      setRoadRoute([start, end]);
-    }
-  };
-
-  const handlePublishRide = () => {
-    if (!currentUser) return;
-
-    const newRide: RidePost = {
-      id: "RIDE-" + Date.now().toString().slice(-4),
-      driverId: currentUser.id,
-      driverName: currentUser.name,
-      driverPhone: currentUser.phone,
-      isVerified: currentUser.isVerified,
-      vehicle: currentUser.vehicleModel || "Vehicle",
-      vehicleType: currentUser.vehicleType,
-      seats,
-      price,
-      startName: startQuery,
-      startCoords,
-      endName: endQuery,
-      endCoords,
-      routePolyline: roadRoute.length > 0 ? roadRoute : [startCoords, endCoords],
-      distanceKm: routeDistance || "N/A",
-      status: "created",
-      requests: [],
-    };
-
-    setRidePosts([newRide, ...ridePosts]);
-    alert("🚀 Ride Route Published Live!");
-  };
-
-  const handleStartRide = (rideId: string) => {
-    if (!navigator.geolocation) {
-      alert("⚠️ Your device does not support Geolocation!");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const liveCoords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-
-        setRidePosts((prev) =>
-          prev.map((r) =>
-            r.id === rideId ? { ...r, status: "started", driverLiveCoords: liveCoords } : r
-          )
-        );
-
-        alert("🏁 Ride Started! GPS ON & Sharing Live Location.");
-
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          (watchPos) => {
-            const updatedCoords: [number, number] = [watchPos.coords.latitude, watchPos.coords.longitude];
-            setRidePosts((prev) =>
-              prev.map((r) => (r.id === rideId ? { ...r, driverLiveCoords: updatedCoords } : r))
-            );
-          },
-          (err) => console.error("GPS Watch Error:", err),
-          { enableHighAccuracy: true }
-        );
-      },
-      (err) => {
-        alert("🚨 Location Access Denied! Turn ON GPS to start the ride.");
-      },
-      { enableHighAccuracy: true }
-    );
-  };
-
-  const handleApplyRide = (ride: RidePost) => {
-    if (!currentUser) return;
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const pCoords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-
-        const newReq: PassengerRequest = {
-          passengerId: currentUser.id,
-          passengerName: currentUser.name,
-          passengerPhone: currentUser.phone,
-          passengerCoords: pCoords,
-          status: "pending",
-        };
-
-        setRidePosts((prev) =>
-          prev.map((r) => (r.id === ride.id ? { ...r, requests: [...r.requests, newReq] } : r))
-        );
-
-        alert("📩 Booking Request Sent to Driver!");
-      });
+    if (text.length > 1) {
+      const filtered = landmarkDatabase.filter((place) =>
+        place.name.toLowerCase().includes(text.toLowerCase())
+      );
+      setSuggestions(filtered);
     } else {
-      alert("Please enable location to apply!");
+      setSuggestions([]);
     }
   };
 
-  const handleAcceptPassenger = (rideId: string, passengerId: string) => {
-    setRidePosts((prev) =>
-      prev.map((r) => {
-        if (r.id === rideId) {
-          const updatedReqs = r.requests.map((req) =>
-            req.passengerId === passengerId ? { ...req, status: "accepted" as const } : req
-          );
-          return { ...r, requests: updatedReqs };
-        }
-        return r;
-      })
-    );
-    alert("✅ Passenger Request Accepted! Location visible on map.");
+  // Select Suggestion Option
+  const selectSuggestion = (place: { name: string; coords: [number, number] }) => {
+    if (activeSearchField === 'START') {
+      setStartInput(place.name);
+    } else {
+      setDestInput(place.name);
+      setSelectedCoords(place.coords);
+    }
+    setSuggestions([]);
   };
 
-  const filteredRuralDrivers = ruralDrivers.filter(
-    (d) => vehicleFilter === "all" || d.vehicleType === vehicleFilter
-  );
+  // Click "Done" Button - Zoom to Map Location
+  const handleDoneLocation = () => {
+    if (selectedCoords) {
+      setMapCenter(selectedCoords);
+      setMapZoom(15); // High Resolution Google Maps Zoom Level
+      alert('📍 Map target location locked & zoomed in successfully!');
+    } else {
+      alert('කරුණාකර List එකෙන් අදාල ස්ථානය තෝරාගන්න.');
+    }
+  };
+
+  // Driver KYC Submit
+  const handleKycSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsKycVerified(true);
+    setIsKycModalOpen(false);
+    alert('🎉 KYC Verification Completed! Verified Badge (✅) Granted.');
+  };
+
+  // Driver Live Ride Start
+  const handleStartRide = (rideId: string) => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+          setDriverLiveLocation(coords);
+          setMapCenter(coords);
+          setMapZoom(16);
+          setPublishedRides((prev) =>
+            prev.map((r) => (r.id === rideId ? { ...r, status: 'STARTED' } : r))
+          );
+          alert('🚀 Ride Started! Live GPS location active on Passenger Map.');
+        },
+        () => alert('කරුණාකර ඔබගේ GPS/Location On කරන්න.')
+      );
+    }
+  };
+
+  // Passenger "Come Here" Trigger
+  const handleComeHere = () => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+          setPassengerPickupRequest(coords);
+          setMapCenter(coords);
+          alert('📩 "Come to My Location" Request sent to Driver with Live Location!');
+        },
+        () => alert('කරුණාකර ඔබගේ Location On කරන්න.')
+      );
+    }
+  };
+
+  // Submit Passenger Rating
+  const handleAddReview = () => {
+    if (comment.trim()) {
+      setReviews([...reviews, { passenger: 'Passenger', stars: rating, comment }]);
+      setComment('');
+      alert('⭐ Rating & Review Submitted Successfully!');
+    }
+  };
+
+  if (!isMounted) return null;
 
   return (
-    <div style={{ fontFamily: "sans-serif", backgroundColor: "#0f172a", color: "#f8fafc", minHeight: "100vh", padding: "15px" }}>
-      {!currentUser ? (
-        /* LOGIN / REGISTRATION TOGGLE FORM */
-        <div style={{ maxWidth: "450px", margin: "40px auto", background: "#1e293b", padding: "25px", borderRadius: "12px", border: "1px solid #334155" }}>
-          <h2 style={{ color: "#38bdf8", textAlign: "center", margin: "0 0 15px 0" }}>🌌 Galaxy Rides Portal</h2>
+    <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans text-white">
+      
+      {/* 1. Full Interactive Google-Maps Style Background Layer */}
+      <div className="absolute inset-0 z-0 w-full h-full">
+        <MapContainer center={mapCenter} zoom={mapZoom} zoomControl={false} className="w-full h-full">
+          <ChangeView center={mapCenter} zoom={mapZoom} />
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+          />
 
-          {/* Mode Switcher */}
-          <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-            <button
-              onClick={() => setAuthMode("login")}
-              style={{
-                flex: 1,
-                padding: "10px",
-                background: authMode === "login" ? "#0284c7" : "#0f172a",
-                color: "#fff",
-                border: "none",
-                borderRadius: "6px",
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              🔑 Log In
-            </button>
-            <button
-              onClick={() => setAuthMode("register")}
-              style={{
-                flex: 1,
-                padding: "10px",
-                background: authMode === "register" ? "#0284c7" : "#0f172a",
-                color: "#fff",
-                border: "none",
-                borderRadius: "6px",
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              📝 Register (Sign Up)
-            </button>
-          </div>
-
-          <form onSubmit={authMode === "login" ? handleLogin : handleRegister} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div>
-              <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>ඊමේල් ලිපිනය (Email Address):</label>
-              <input type="email" placeholder="user@example.com" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
-            </div>
-
-            <div>
-              <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>මුරපදය (Password):</label>
-              <input type="password" placeholder="••••••••" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
-            </div>
-
-            {authMode === "register" && (
-              <>
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <button type="button" onClick={() => setSelectedRole("driver")} style={{ flex: 1, padding: "8px", background: selectedRole === "driver" ? "#16a34a" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>🚘 Driver</button>
-                  <button type="button" onClick={() => setSelectedRole("passenger")} style={{ flex: 1, padding: "8px", background: selectedRole === "passenger" ? "#16a34a" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>🙋‍♂️ Passenger</button>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>සම්පූර්ණ නම (Full Name):</label>
-                  <input type="text" placeholder="e.g. කසුන් පෙරේරා" value={nameInput} onChange={(e) => setNameInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>දුරකථන අංකය (Phone Number):</label>
-                  <input type="text" placeholder="07XXXXXXXX" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>NIC අංකය (KYC Verification):</label>
-                  <input type="text" placeholder="98XXXXXXXXV" value={nicInput} onChange={(e) => setNicInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} required />
-                </div>
-
-                {selectedRole === "driver" && (
-                  <>
-                    <div>
-                      <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>Driving License Number:</label>
-                      <input type="text" value={licenseInput} onChange={(e) => setLicenseInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>වාහන වර්ගය:</label>
-                      <select value={vehicleTypeInput} onChange={(e) => setVehicleTypeInput(e.target.value as any)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }}>
-                        <option value="tuk">🛺 Three-Wheeler</option>
-                        <option value="car">🚗 Car (B11, Alto, etc.)</option>
-                        <option value="van">🚐 Van / Mini Bus</option>
-                        <option value="truck">🛻 Light Truck (Dimo Batta)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>වාහන මාදිලිය සහ අංකය:</label>
-                      <input type="text" value={vehicleModelInput} onChange={(e) => setVehicleModelInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>ගම / නගරය:</label>
-                      <input type="text" value={villageInput} onChange={(e) => setVillageInput(e.target.value)} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
-                    </div>
-
-                    <div>
-                      <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>1 KM ගාස්තුව (Rs. Rate / KM):</label>
-                      <input type="number" value={ratePerKmInput} onChange={(e) => setRatePerKmInput(Number(e.target.value))} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-
-            <button type="submit" disabled={loading} style={{ padding: "12px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginTop: "10px" }}>
-              {loading ? "Processing..." : authMode === "login" ? "🔑 Log In Now" : "📝 Complete Registration"}
-            </button>
-          </form>
-        </div>
-      ) : (
-        /* MAIN APP INTERFACE */
-        <div>
-          {/* Header */}
-          <div style={{ background: "#1e293b", padding: "15px", borderRadius: "12px", marginBottom: "15px", border: "1px solid #334155" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-              <h2 style={{ margin: 0, color: "#38bdf8" }}>
-                🌌 Galaxy Rides ({currentUser.role.toUpperCase()})
-              </h2>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ background: "#0f172a", padding: "6px 12px", borderRadius: "8px", border: "1px solid #38bdf8", fontSize: "0.85rem" }}>
-                  👤 {currentUser.name} {currentUser.isVerified && <span style={{ color: "#4ade80" }}>Verified ✅</span>}
-                </div>
-
-                <select value={lang} onChange={(e) => setLang(e.target.value as Language)} style={{ padding: "6px", background: "#0f172a", color: "#fff", border: "1px solid #334155", borderRadius: "6px" }}>
-                  <option value="si">🇱🇰 සිංහල</option>
-                  <option value="en">🇬🇧 English</option>
-                  <option value="ta">🇱🇰 தமிழ்</option>
-                </select>
-
-                <button onClick={handleLogout} style={{ background: "#ef4444", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer" }}>
-                  Logout
-                </button>
-              </div>
-            </div>
-
-            {/* Mode Switcher */}
-            <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
-              <button onClick={() => setActiveTab("carpool")} style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", background: activeTab === "carpool" ? "#0284c7" : "#0f172a", color: "#fff" }}>
-                🚗 Route Sharing (Carpool Live Map)
-              </button>
-              <button onClick={() => setActiveTab("rural_taxi")} style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", background: activeTab === "rural_taxi" ? "#16a34a" : "#0f172a", color: "#fff" }}>
-                🛺 ග්‍රාමීය Taxi & බඩු ප්‍රවාහනය
-              </button>
-            </div>
-          </div>
-
-          {/* MODE 1: ROUTE SHARING */}
-          {activeTab === "carpool" && (
-            <div>
-              {currentUser.role === "driver" ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "20px" }}>
-                  <div>
-                    <div style={{ background: "#1e293b", padding: "18px", borderRadius: "12px", marginBottom: "15px", border: "1px solid #334155" }}>
-                      <h3 style={{ color: "#38bdf8", margin: "0 0 10px 0" }}>🚗 Post Live Route (OSRM Distance)</h3>
-
-                      <div style={{ marginBottom: "10px", position: "relative" }}>
-                        <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>Start Location</label>
-                        <input type="text" value={startQuery} onChange={(e) => { setStartQuery(e.target.value); fetchSuggestions(e.target.value, setStartSuggestions); }} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
-                        {startSuggestions.length > 0 && (
-                          <ul style={{ position: "absolute", background: "#1e293b", border: "1px solid #38bdf8", width: "100%", zIndex: 100, listStyle: "none", padding: 0 }}>
-                            {startSuggestions.map((s, idx) => (
-                              <li key={idx} onClick={() => { setStartCoords([parseFloat(s.lat), parseFloat(s.lon)]); setStartQuery(s.display_name); setStartSuggestions([]); updateRoute([parseFloat(s.lat), parseFloat(s.lon)], endCoords); }} style={{ padding: "8px", cursor: "pointer", borderBottom: "1px solid #334155" }}>🟢 {s.display_name}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-
-                      <div style={{ marginBottom: "10px", position: "relative" }}>
-                        <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>Destination</label>
-                        <input type="text" value={endQuery} onChange={(e) => { setEndQuery(e.target.value); fetchSuggestions(e.target.value, setEndSuggestions); }} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #38bdf8", borderRadius: "6px" }} />
-                        {endSuggestions.length > 0 && (
-                          <ul style={{ position: "absolute", background: "#1e293b", border: "1px solid #38bdf8", width: "100%", zIndex: 100, listStyle: "none", padding: 0 }}>
-                            {endSuggestions.map((s, idx) => (
-                              <li key={idx} onClick={() => { setEndCoords([parseFloat(s.lat), parseFloat(s.lon)]); setEndQuery(s.display_name); setEndSuggestions([]); updateRoute(startCoords, [parseFloat(s.lat), parseFloat(s.lon)]); }} style={{ padding: "8px", cursor: "pointer", borderBottom: "1px solid #334155" }}>🔴 {s.display_name}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-
-                      <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>Seats Available:</label>
-                          <input type="number" value={seats} onChange={(e) => setSeats(Number(e.target.value))} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ fontSize: "0.8rem", color: "#cbd5e1" }}>Price per Seat (Rs.):</label>
-                          <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} style={{ width: "100%", padding: "8px", background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px" }} />
-                        </div>
-                      </div>
-
-                      {routeDistance && <p style={{ margin: "5px 0 10px 0", color: "#4ade80", fontSize: "0.85rem", fontWeight: "bold" }}>📏 Total OSRM Distance: {routeDistance}</p>}
-
-                      <button onClick={handlePublishRide} style={{ width: "100%", padding: "10px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>
-                        Publish Route Live
-                      </button>
-                    </div>
-
-                    <h3>📋 My Posted Long Distance Rides</h3>
-                    {ridePosts.filter((r) => r.driverId === currentUser.id).map((ride) => (
-                      <div key={ride.id} style={{ background: "#1e293b", padding: "15px", borderRadius: "12px", marginBottom: "12px", border: "1px solid #334155" }}>
-                        <h4 style={{ margin: 0, color: "#38bdf8" }}>{ride.startName} ➔ {ride.endName}</h4>
-                        <p style={{ fontSize: "0.85rem", color: "#94a3b8", margin: "6px 0" }}>Status: {ride.status === "started" ? "🟢 LIVE IN PROGRESS" : "⏳ Scheduled"}</p>
-
-                        {ride.status !== "started" && (
-                          <button onClick={() => handleStartRide(ride.id)} style={{ padding: "8px 14px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", fontSize: "0.85rem" }}>
-                            📍 Turn ON GPS & Start Live Ride
-                          </button>
-                        )}
-
-                        {ride.requests.length > 0 && (
-                          <div style={{ marginTop: "10px", background: "#0f172a", padding: "10px", borderRadius: "8px" }}>
-                            <h5 style={{ margin: "0 0 6px 0", color: "#f59e0b" }}>📩 Passenger Requests:</h5>
-                            {ride.requests.map((req, idx) => (
-                              <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                                <span style={{ fontSize: "0.8rem" }}>🙋‍♂️ {req.passengerName} ({req.passengerPhone})</span>
-                                {req.status === "pending" ? (
-                                  <button onClick={() => handleAcceptPassenger(ride.id, req.passengerId)} style={{ background: "#0284c7", color: "#fff", border: "none", padding: "4px 8px", borderRadius: "4px", cursor: "pointer", fontSize: "0.75rem" }}>Accept Request</button>
-                                ) : (
-                                  <span style={{ color: "#4ade80", fontSize: "0.75rem" }}>✅ Accepted (Location Visible)</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div style={{ height: "550px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
-                    <MapContainer bounds={mapBounds} style={{ height: "100%", width: "100%" }}>
-                      <MapFlyTo bounds={mapBounds} />
-                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                      {greenIcon && <Marker position={startCoords} icon={greenIcon}><Popup>Start</Popup></Marker>}
-                      {redIcon && <Marker position={endCoords} icon={redIcon}><Popup>End</Popup></Marker>}
-                      {roadRoute.length > 0 && <Polyline positions={roadRoute} pathOptions={{ color: "#2563eb", weight: 5 }} />}
-
-                      {ridePosts.find((r) => r.driverId === currentUser.id)?.driverLiveCoords && carIcon && (
-                        <Marker position={ridePosts.find((r) => r.driverId === currentUser.id)!.driverLiveCoords!} icon={carIcon}>
-                          <Popup>🚘 Your Live Position</Popup>
-                        </Marker>
-                      )}
-
-                      {ridePosts.find((r) => r.driverId === currentUser.id)?.requests.filter((req) => req.status === "accepted").map((req, i) => (
-                        passengerIcon && (
-                          <Marker key={i} position={req.passengerCoords} icon={passengerIcon}>
-                            <Popup>🙋‍♂️ Passenger: {req.passengerName}</Popup>
-                          </Marker>
-                        )
-                      ))}
-                    </MapContainer>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "20px" }}>
-                  <div>
-                    <h3>🚗 Available Driver Rides</h3>
-                    {ridePosts.map((ride) => (
-                      <div key={ride.id} onClick={() => { setSelectedRideForPassenger(ride); setMapBounds([[ride.startCoords[0], ride.startCoords[1]], [ride.endCoords[0], ride.endCoords[1]]]); }} style={{ background: "#1e293b", padding: "15px", borderRadius: "12px", marginBottom: "12px", border: selectedRideForPassenger?.id === ride.id ? "2px solid #38bdf8" : "1px solid #334155", cursor: "pointer" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <h4 style={{ margin: 0, color: "#38bdf8" }}>{ride.driverName} {ride.isVerified && <span style={{ color: "#4ade80" }}>Verified ✅</span>}</h4>
-                          {ride.status === "started" ? (
-                            <span style={{ background: "#16a34a", color: "#fff", padding: "2px 8px", borderRadius: "10px", fontSize: "0.7rem" }}>🔴 LIVE RIDE STARTED</span>
-                          ) : (
-                            <span style={{ background: "#64748b", color: "#fff", padding: "2px 8px", borderRadius: "10px", fontSize: "0.7rem" }}>Scheduled</span>
-                          )}
-                        </div>
-                        <p style={{ margin: "6px 0", fontSize: "0.85rem", color: "#cbd5e1" }}>📍 {ride.startName} ➔ {ride.endName}</p>
-                        <p style={{ margin: "0", color: "#94a3b8", fontSize: "0.8rem" }}>Vehicle: {ride.vehicle} | LKR {ride.price} | Seats: {ride.seats}</p>
-
-                        <button onClick={(e) => { e.stopPropagation(); handleApplyRide(ride); }} style={{ marginTop: "10px", padding: "8px 14px", background: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", fontSize: "0.85rem" }}>
-                          ✋ Apply / Book Ride
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div style={{ height: "550px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
-                    <MapContainer bounds={mapBounds} style={{ height: "100%", width: "100%" }}>
-                      <MapFlyTo bounds={mapBounds} />
-                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-
-                      {selectedRideForPassenger && (
-                        <>
-                          {greenIcon && <Marker position={selectedRideForPassenger.startCoords} icon={greenIcon}><Popup>Start</Popup></Marker>}
-                          {redIcon && <Marker position={selectedRideForPassenger.endCoords} icon={redIcon}><Popup>End</Popup></Marker>}
-                          <Polyline positions={selectedRideForPassenger.routePolyline} pathOptions={{ color: "#2563eb", weight: 5 }} />
-
-                          {selectedRideForPassenger.driverLiveCoords && carIcon && (
-                            <Marker position={selectedRideForPassenger.driverLiveCoords} icon={carIcon}>
-                              <Popup>🚘 Driver's Live GPS Location</Popup>
-                            </Marker>
-                          )}
-                        </>
-                      )}
-                    </MapContainer>
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Selected Destination Target Marker */}
+          {selectedCoords && (
+            <Marker position={selectedCoords}>
+              <Popup>🏁 Target Destination: {destInput}</Popup>
+            </Marker>
           )}
 
-          {/* MODE 2: RURAL TAXI & TRANSPORT DIRECTORY */}
-          {activeTab === "rural_taxi" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "20px" }}>
-              <div>
-                <div style={{ background: "#1e293b", padding: "12px", borderRadius: "12px", marginBottom: "15px", border: "1px solid #334155" }}>
-                  <h4 style={{ margin: "0 0 10px 0", color: "#4ade80" }}>🔎 වාහන වර්ගය තෝරන්න</h4>
-                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                    <button onClick={() => setVehicleFilter("all")} style={{ padding: "6px 12px", background: vehicleFilter === "all" ? "#16a34a" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}>සියල්ල</button>
-                    <button onClick={() => setVehicleFilter("tuk")} style={{ padding: "6px 12px", background: vehicleFilter === "tuk" ? "#16a34a" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}>🛺 ත්‍රීවීල්</button>
-                    <button onClick={() => setVehicleFilter("car")} style={{ padding: "6px 12px", background: vehicleFilter === "car" ? "#16a34a" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}>🚗 Cars (B11/Alto)</button>
-                    <button onClick={() => setVehicleFilter("truck")} style={{ padding: "6px 12px", background: vehicleFilter === "truck" ? "#16a34a" : "#0f172a", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem" }}>🛻 Dimo Batta</button>
+          {/* Live Driver GPS Position */}
+          {driverLiveLocation && (
+            <Marker position={driverLiveLocation}>
+              <Popup>🚕 Driver Live Location (In Motion)</Popup>
+            </Marker>
+          )}
+
+          {/* Passenger "Come Here" Location */}
+          {passengerPickupRequest && (
+            <Marker position={passengerPickupRequest}>
+              <Popup>👤 Passenger Pickup Location ("Come Here")</Popup>
+            </Marker>
+          )}
+        </MapContainer>
+      </div>
+
+      {/* 2. Top Header Bar & Mode / KYC Status */}
+      <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap justify-between items-center gap-2 max-w-xl mx-auto">
+        <div className="bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-700/60 shadow-2xl flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-sky-600 rounded-xl flex items-center justify-center font-bold text-sm shadow">
+            🌌
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-xs font-bold text-sky-400">Galaxy Rides Pro</h1>
+              {isKycVerified && (
+                <span className="bg-green-500/20 text-green-400 border border-green-500/50 text-[10px] px-1.5 py-0.2 rounded-md font-bold">
+                  Verified ✅
+                </span>
+              )}
+            </div>
+            <p className="text-[9px] text-slate-300">Live Navigation & Proximity System</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {userRole === 'DRIVER' && !isKycVerified && (
+            <button
+              onClick={() => setIsKycModalOpen(true)}
+              className="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow border border-sky-400 animate-pulse"
+            >
+              Verify KYC 🛡️
+            </button>
+          )}
+
+          <button
+            onClick={() => setUserRole(userRole === 'DRIVER' ? 'PASSENGER' : 'DRIVER')}
+            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-3 py-2 rounded-xl shadow-xl backdrop-blur-md border border-amber-300 transition"
+          >
+            {userRole === 'DRIVER' ? '👤 Passenger View' : '🚕 Driver View'}
+          </button>
+        </div>
+      </div>
+
+      {/* 3. Bottom Action Panel */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 p-3 max-w-xl mx-auto">
+        <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-3xl p-4 shadow-2xl max-h-[82vh] overflow-y-auto space-y-4">
+          
+          <div className="w-10 h-0.5 bg-slate-600 rounded-full mx-auto opacity-60"></div>
+
+          {userRole === 'DRIVER' ? (
+            /* DRIVER POST ROUTE PANEL */
+            <div className="space-y-3">
+              <h2 className="text-xs font-bold text-sky-400">🚕 Post Driver Route with Auto-Suggestions</h2>
+
+              {/* Start & Destination Fields with Auto-Suggestions */}
+              <div className="space-y-2 relative">
+                <div>
+                  <label className="block text-[10px] text-slate-300 mb-1">Start Location</label>
+                  <input
+                    type="text"
+                    value={startInput}
+                    onChange={(e) => handleInputChange(e.target.value, 'START')}
+                    placeholder="Type Start (e.g. Colombo Fort)"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-sky-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-300 mb-1">End Location Target</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={destInput}
+                      onChange={(e) => handleInputChange(e.target.value, 'DEST')}
+                      placeholder="Type Destination (e.g. Kandy, Dalada Maligawa)"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-sky-500"
+                    />
+                    <button
+                      onClick={handleDoneLocation}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow"
+                    >
+                      Done 🎯
+                    </button>
                   </div>
                 </div>
 
-                <h3>📍 ළඟ ඉන්න ග්‍රාමීය Drivers ලා Directory</h3>
-                {filteredRuralDrivers.map((driver) => (
-                  <div key={driver.id} style={{ background: "#1e293b", padding: "14px", borderRadius: "12px", marginBottom: "12px", border: "1px solid #334155" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <h4 style={{ margin: 0, color: "#38bdf8" }}>
-                        {driver.name} {driver.isVerified && <span style={{ color: "#4ade80" }}>✅</span>}
-                      </h4>
-                      <span style={{ background: "#16a34a", color: "#fff", padding: "2px 8px", borderRadius: "10px", fontSize: "0.7rem" }}>ONLINE</span>
-                    </div>
-                    <p style={{ margin: "6px 0", fontSize: "0.85rem", color: "#cbd5e1" }}>
-                      🚘 {driver.vehicleName} ({driver.vehicleNo})
-                    </p>
-                    <p style={{ margin: "0 0 10px 0", color: "#f59e0b", fontSize: "0.85rem", fontWeight: "bold" }}>
-                      🏡 ගම: {driver.village} | 💵 1 km ට රු. {driver.ratePerKm}
-                    </p>
+                {/* Auto Suggestions Dropdown */}
+                {suggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-sky-500/50 rounded-xl shadow-2xl z-50 max-h-40 overflow-y-auto">
+                    {suggestions.map((place, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => selectSuggestion(place)}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-sky-950/80 border-b border-slate-800/50 text-slate-200"
+                      >
+                        📍 {place.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <a href={`tel:${driver.phone}`} style={{ flex: 1, textAlign: "center", textDecoration: "none", background: "#2563eb", color: "#fff", padding: "8px", borderRadius: "6px", fontWeight: "bold", fontSize: "0.8rem" }}>
-                        📞 Direct Call
-                      </a>
-                      <a href={`https://wa.me/94${driver.phone.slice(1)}`} target="_blank" rel="noreferrer" style={{ flex: 1, textAlign: "center", textDecoration: "none", background: "#16a34a", color: "#fff", padding: "8px", borderRadius: "6px", fontWeight: "bold", fontSize: "0.8rem" }}>
-                        💬 WhatsApp
+              {/* Driver Actions & Active Live Ride Controller */}
+              {publishedRides.map((ride) => (
+                <div key={ride.id} className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <p className="font-bold text-sky-300">
+                      🚕 {ride.driverName} {isKycVerified && '✅'}
+                    </p>
+                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-amber-400">
+                      Status: {ride.status}
+                    </span>
+                  </div>
+
+                  <p className="text-slate-300 text-[11px]">📍 {ride.start} ➔ {ride.dest}</p>
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => handleStartRide(ride.id)}
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-xl text-xs"
+                    >
+                      Start Ride (GPS On) 🚀
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* PASSENGER NEARBY RIDE FILTER & LIVE ACTION PANEL */
+            <div className="space-y-3">
+              <h2 className="text-xs font-bold text-amber-400">🔍 Nearby Drivers Within 10km - 15km Radius</h2>
+
+              {/* Live Driver Feed */}
+              <div className="space-y-2">
+                {publishedRides.map((ride) => (
+                  <div key={ride.id} className="bg-slate-950 p-3 rounded-2xl border border-sky-500/30 space-y-2 text-xs">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold text-sky-300 text-sm flex items-center gap-1">
+                          🚕 {ride.driverName} {ride.isVerified && '✅'}
+                        </p>
+                        <p className="text-[10px] text-slate-400">📞 {ride.phone} | WhatsApp: {ride.whatsapp}</p>
+                      </div>
+                      <span className="bg-emerald-950 text-emerald-300 border border-emerald-600 text-[10px] font-bold px-2 py-0.5 rounded">
+                        Rs. {ride.price}
+                      </span>
+                    </div>
+
+                    <p className="text-slate-300 text-[11px]">📍 {ride.start} ➔ {ride.dest}</p>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={handleComeHere}
+                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 rounded-xl text-xs"
+                      >
+                        Come Here 📍 (Send Pickup Location)
+                      </button>
+
+                      <a
+                        href={`https://wa.me/${ride.whatsapp.replace('+', '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded-xl text-xs text-center block"
+                      >
+                        WhatsApp Chat 💬
                       </a>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div style={{ height: "550px", borderRadius: "12px", overflow: "hidden", border: "1px solid #334155" }}>
-                <MapContainer center={[8.3114, 80.4037]} zoom={10} style={{ height: "100%", width: "100%" }}>
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  {filteredRuralDrivers.map((driver) => {
-                    const icon = getDriverIcon(driver.vehicleType);
-                    return (
-                      icon && (
-                        <Marker key={driver.id} position={driver.coords} icon={icon}>
-                          <Popup>
-                            <div style={{ color: "#000" }}>
-                              <strong>{driver.name} ✅</strong> <br />
-                              {driver.vehicleName} ({driver.vehicleNo}) <br />
-                              🏡 {driver.village} <br />
-                              📞 <a href={`tel:${driver.phone}`}>{driver.phone}</a>
-                            </div>
-                          </Popup>
-                        </Marker>
-                      )
-                    );
-                  })}
-                </MapContainer>
+              {/* Rating & Review Section */}
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
+                <h3 className="text-xs font-bold text-slate-300">⭐ Rate & Review Driver</h3>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={rating}
+                    onChange={(e) => setRating(Number(e.target.value))}
+                    className="bg-slate-900 border border-slate-700 rounded-lg text-xs p-1 text-white"
+                  >
+                    <option value={5}>5 Stars ⭐⭐⭐⭐⭐</option>
+                    <option value={4}>4 Stars ⭐⭐⭐⭐</option>
+                    <option value={3}>3 Stars ⭐⭐⭐</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Write a comment..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
+                  />
+                  <button
+                    onClick={handleAddReview}
+                    className="bg-sky-600 hover:bg-sky-500 text-white font-bold px-3 py-1 rounded-lg text-xs"
+                  >
+                    Submit
+                  </button>
+                </div>
               </div>
             </div>
           )}
+
+        </div>
+      </div>
+
+      {/* 4. Driver KYC Verification Modal */}
+      {isKycModalOpen && (
+        <div className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-5 max-w-md w-full space-y-4">
+            <h2 className="text-base font-bold text-sky-400">🛡️ Driver KYC Identity Verification</h2>
+            <p className="text-xs text-slate-300">
+              Verified Driver Badge (✅) එක ලබාගැනීමට පහත විස්තර සම්පූර්ණ කරන්න:
+            </p>
+
+            <form onSubmit={handleKycSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1">1. National ID (NIC) / Driving License Photo</label>
+                <input type="file" required className="w-full text-slate-300 bg-slate-950 p-2 rounded-xl border border-slate-800" />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1">2. Live Face Scan Verification</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKycForm({ ...kycForm, faceScanDone: true });
+                    alert('📸 Live Face Scan Captured Successfully!');
+                  }}
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-sky-300 py-2 rounded-xl border border-sky-500/40"
+                >
+                  {kycForm.faceScanDone ? '✅ Face Scan Completed' : '📷 Take Live Face Scan'}
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1">3. Job / Profession Document (Optional)</label>
+                <input type="file" className="w-full text-slate-300 bg-slate-950 p-2 rounded-xl border border-slate-800" />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsKycModalOpen(false)}
+                  className="w-1/2 bg-slate-800 hover:bg-slate-700 py-2 rounded-xl font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded-xl"
+                >
+                  Submit & Verify ✅
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
+
     </div>
   );
 }
