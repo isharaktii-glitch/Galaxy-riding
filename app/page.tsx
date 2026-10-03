@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import { supabase } from "@/lib/supabase"; // Supabase client setup
 
 // Dynamic Imports for Leaflet (SSR Safety for Next.js)
 const MapContainer = dynamic(
@@ -229,102 +228,75 @@ export default function GalaxyRidesApp() {
     return carIcon;
   };
 
-  // --- SUPABASE AUTH HANDLERS ---
-  const handleRegister = async (e: React.FormEvent) => {
+  // --- LOCAL AUTH HANDLERS ---
+  const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      // 1. Supabase Auth Sign Up
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+    setTimeout(() => {
+      const profileData: UserProfile = {
+        id: "USR-" + Date.now().toString().slice(-4),
         email: emailInput,
-        password: passwordInput,
-      });
+        name: nameInput,
+        phone: phoneInput,
+        nic: nicInput,
+        role: selectedRole,
+        isVerified: true,
+        drivingLicense: licenseInput,
+        vehicleType: vehicleTypeInput,
+        vehicleModel: vehicleModelInput,
+        vehicleNo: vehicleNoInput,
+        ratePerKm: ratePerKmInput,
+        villageOrCity: villageInput,
+      };
 
-      if (authError) throw authError;
+      setCurrentUser(profileData);
 
-      if (authData.user) {
-        const profileData: UserProfile = {
-          id: authData.user.id,
-          email: emailInput,
-          name: nameInput,
-          phone: phoneInput,
-          nic: nicInput,
-          role: selectedRole,
-          isVerified: true,
-          drivingLicense: licenseInput,
-          vehicleType: vehicleTypeInput,
-          vehicleModel: vehicleModelInput,
-          vehicleNo: vehicleNoInput,
-          ratePerKm: ratePerKmInput,
-          villageOrCity: villageInput,
-        };
-
-        setCurrentUser(profileData);
-
-        if (selectedRole === "driver") {
-          setRuralDrivers((prev) => [
-            {
-              id: profileData.id,
-              name: profileData.name,
-              phone: profileData.phone,
-              village: villageInput || "ග්‍රාමීය ප්‍රදේශය",
-              vehicleType: vehicleTypeInput,
-              vehicleName: vehicleModelInput || "වාහනය",
-              vehicleNo: vehicleNoInput || "NC-XXXX",
-              ratePerKm: ratePerKmInput,
-              coords: [8.2 + Math.random() * 0.1, 80.3 + Math.random() * 0.1],
-              isVerified: true,
-              isOnline: true,
-            },
-            ...prev,
-          ]);
-        }
-
-        alert("✅ Account Registered & KYC Verified Successfully!");
+      if (selectedRole === "driver") {
+        setRuralDrivers((prev) => [
+          {
+            id: profileData.id,
+            name: profileData.name,
+            phone: profileData.phone,
+            village: villageInput || "ග්‍රාමීය ප්‍රදේශය",
+            vehicleType: vehicleTypeInput,
+            vehicleName: vehicleModelInput || "වාහනය",
+            vehicleNo: vehicleNoInput || "NC-XXXX",
+            ratePerKm: ratePerKmInput,
+            coords: [8.2 + Math.random() * 0.1, 80.3 + Math.random() * 0.1],
+            isVerified: true,
+            isOnline: true,
+          },
+          ...prev,
+        ]);
       }
-    } catch (err: any) {
-      alert("❌ Registration Error: " + err.message);
-    } finally {
+
       setLoading(false);
-    }
+      alert("✅ Account Registered & KYC Verified Successfully!");
+    }, 500);
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+    setTimeout(() => {
+      const loggedUser: UserProfile = {
+        id: "USR-" + Date.now().toString().slice(-4),
         email: emailInput,
-        password: passwordInput,
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        // Mock profile load after successful login
-        const loggedUser: UserProfile = {
-          id: data.user.id,
-          email: data.user.email || emailInput,
-          name: emailInput.split("@")[0],
-          phone: "077XXXXXXX",
-          nic: "99XXXXXXXV",
-          role: selectedRole,
-          isVerified: true,
-        };
-        setCurrentUser(loggedUser);
-        alert("✅ Logged in successfully!");
-      }
-    } catch (err: any) {
-      alert("❌ Login Error: " + err.message);
-    } finally {
+        name: emailInput.split("@")[0],
+        phone: "0771234567",
+        nic: "991234567V",
+        role: selectedRole,
+        isVerified: true,
+      };
+      setCurrentUser(loggedUser);
       setLoading(false);
-    }
+      alert("✅ Logged in successfully!");
+    }, 500);
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
     setCurrentUser(null);
   };
 
@@ -397,7 +369,7 @@ export default function GalaxyRidesApp() {
 
   const handleStartRide = (rideId: string) => {
     if (!navigator.geolocation) {
-      alert("⚠️️ Your device does not support Geolocation!");
+      alert("⚠️ Your device does not support Geolocation!");
       return;
     }
 
